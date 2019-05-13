@@ -909,7 +909,7 @@ static const FormatInfo FormatInfos[] = {
 	/* 0x24 X_D3DFMT_YUY2         */ { 16, Linear, ____YUY2, XTL::D3DFMT_YUY2      },
 	/* 0x25 X_D3DFMT_UYVY         */ { 16, Linear, ____UYVY, XTL::D3DFMT_UYVY      },
 	/* 0x26 undefined             */ {},
-	/* 0x27 X_D3DFMT_L6V5U5       */ { 16, Swzzld, __R6G5B5, XTL::D3DFMT_L6V5U5    }, // Alias : X_D3DFMT_R6G5B5 // XQEMU NOTE : This might be signed
+	/* 0x27 X_D3DFMT_L6V5U5       */ { 16, Swzzld, __R6G5B5, XTL::D3DFMT_A8R8G8B8  , Texture, "X_D3DFMT_R8B8 -> D3DFMT_R5G6B5" }, // Alias : X_D3DFMT_R6G5B5 // XQEMU NOTE : This might be signed
 	/* 0x28 X_D3DFMT_V8U8         */ { 16, Swzzld, ____G8B8, XTL::D3DFMT_V8U8      }, // Alias : X_D3DFMT_G8B8 // XQEMU NOTE : This might be signed
 	/* 0x29 X_D3DFMT_R8B8         */ { 16, Swzzld, ____R8B8, XTL::D3DFMT_R5G6B5    , Texture, "X_D3DFMT_R8B8 -> D3DFMT_R5G6B5" }, // XQEMU NOTE : This might be signed
 	/* 0x2A X_D3DFMT_D24S8        */ { 32, Swzzld, NoCmpnts, XTL::D3DFMT_D24S8     , DepthBuffer },

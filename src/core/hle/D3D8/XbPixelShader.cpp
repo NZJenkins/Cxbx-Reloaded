@@ -2964,22 +2964,88 @@ bool PSH_XBOX_SHADER::InsertTextureModeInstruction(XTL::X_D3DPIXELSHADERDEF *pPS
             // NOTE: This assumes that this shader will only ever be used for the input bumpmap texture
             // If this causes regressions in other titles, we'll need to be smarter about this
             // and include the texture formats in the shader hash, somehow.
-            extern XTL::X_D3DBaseTexture* XTL::EmuD3DActiveTexture[TEXTURE_STAGES];
-            extern XTL::X_D3DFORMAT GetXboxPixelContainerFormat(const XTL::X_D3DPixelContainer *pXboxPixelContainer);
-            auto format = GetXboxPixelContainerFormat(XTL::EmuD3DActiveTexture[0]);
-            bool bias = false;
-            if (format == XTL::X_D3DFMT_X8L8V8U8 || format == XTL::X_D3DFMT_L6V5U5) {
-                bias = true;
-            }
+            //extern XTL::X_D3DBaseTexture* XTL::EmuD3DActiveTexture[TEXTURE_STAGES];
+            //extern XTL::X_D3DFORMAT GetXboxPixelContainerFormat(const XTL::X_D3DPixelContainer *pXboxPixelContainer);
+            //auto format = GetXboxPixelContainerFormat(XTL::EmuD3DActiveTexture[inputStage]);
+            bool rgbToLvu = true;
+    //        if (format == XTL::X_D3DFMT_X8L8V8U8 || format == XTL::X_D3DFMT_L6V5U5) {
+				//rgbToLvu = true;
+    //        }
+
+			if (rgbToLvu) {
+				// We need to:
+				// - interpret RGB as LVU, where U, V contain signed data
+				// - Expand to the range -1, 1.
+				// - Reverse the channel order - so we have R/U - G/V - B/L
+
+				// Subtract 1 from the texture and store in temp N
+				// If a channel value should be negative, we will use this value
+				Ins.Initialize(PO_SUB);
+				Ins.Output[0].SetRegister(PARAM_R, 6, MASK_RGBA);
+				Ins.Parameters[0].SetRegister(PARAM_R, PSH_XBOX_MAX_R_REGISTER_COUNT + inputStage, MASK_RGBA);
+				Ins.Parameters[1].SetScaleConstRegister(1.0f, Recompiled);
+				InsertIns.emplace_back(Ins);
+
+				// If anything is <= 0.5 then it should be negative
+				// TODO account for rounding? This code is broken
+
+				// Store values to use for comparison in temp C
+				// We subtract 0.5, then use CMP
+				Ins.Initialize(PO_SUB);
+				Ins.Output[0].SetRegister(PARAM_R, 7, MASK_RGBA);
+				Ins.Parameters[0].SetRegister(PARAM_R, PSH_XBOX_MAX_R_REGISTER_COUNT + inputStage, MASK_RGBA);
+				Ins.Parameters[1].SetScaleConstRegister(0.5, Recompiled);
+				InsertIns.emplace_back(Ins);
+
+				// B -> U (into temp N so we don't overwrite L)
+				Ins.Initialize(PO_CMP);
+				Ins.Output[0].SetRegister(PARAM_R, 6, MASK_B);
+				Ins.Parameters[0].SetRegister(PARAM_R, 7, MASK_B);
+				Ins.Parameters[1].SetRegister(PARAM_R, 6, MASK_B);
+				Ins.Parameters[2].SetRegister(PARAM_R, PSH_XBOX_MAX_R_REGISTER_COUNT + inputStage, MASK_B);
+				//Ins.Parameters[0].Modifiers = 1 << ARGMOD_NEGATE;
+				InsertIns.emplace_back(Ins);
+
+				// Move L, from R to B
+				Ins.Initialize(PO_MOV);
+				Ins.Output[0].SetRegister(PARAM_R, PSH_XBOX_MAX_R_REGISTER_COUNT + inputStage, MASK_B);
+				Ins.Parameters[0].SetRegister(PARAM_R, PSH_XBOX_MAX_R_REGISTER_COUNT + inputStage, MASK_R);
+				InsertIns.emplace_back(Ins);
+
+				// Move/swizzle U, (from temp N B to R)
+				Ins.Initialize(PO_MOV);
+				Ins.Output[0].SetRegister(PARAM_R, PSH_XBOX_MAX_R_REGISTER_COUNT + inputStage, MASK_R);
+				Ins.Parameters[0].SetRegister(PARAM_R, 6, MASK_B);
+				InsertIns.emplace_back(Ins);
+
+				// G -> V
+				Ins.Initialize(PO_CMP);
+				Ins.Output[0].SetRegister(PARAM_R, PSH_XBOX_MAX_R_REGISTER_COUNT + inputStage, MASK_G);
+				Ins.Parameters[0].SetRegister(PARAM_R, 7, MASK_G);
+				Ins.Parameters[1].SetRegister(PARAM_R, 6, MASK_G);
+				Ins.Parameters[2].SetRegister(PARAM_R, PSH_XBOX_MAX_R_REGISTER_COUNT + inputStage, MASK_G);
+				//Ins.Parameters[0].Modifiers = 1 << ARGMOD_NEGATE;
+				InsertIns.emplace_back(Ins);
+
+				// Scale x2
+				// U / R
+				Ins.Initialize(PO_MUL);
+				Ins.Output[0].SetRegister(PARAM_R, PSH_XBOX_MAX_R_REGISTER_COUNT + inputStage, MASK_R);
+				Ins.Parameters[0].SetRegister(PARAM_R, PSH_XBOX_MAX_R_REGISTER_COUNT + inputStage, MASK_R);
+				Ins.Parameters[1].SetScaleConstRegister(2.0, Recompiled);
+				InsertIns.emplace_back(Ins);
+				// V / G
+				Ins.Initialize(PO_MUL);
+				Ins.Output[0].SetRegister(PARAM_R, PSH_XBOX_MAX_R_REGISTER_COUNT + inputStage, MASK_G);
+				Ins.Parameters[0].SetRegister(PARAM_R, PSH_XBOX_MAX_R_REGISTER_COUNT + inputStage, MASK_G);
+				Ins.Parameters[1].SetScaleConstRegister(2.0, Recompiled);
+				InsertIns.emplace_back(Ins);
+			}
 
             Ins.Initialize(PO_MAD);
             Ins.Output[0].SetRegister(PARAM_R, 1, MASK_R);
             Ins.Parameters[0].SetScaleBemLumRegister(XTL::D3DTSS_BUMPENVMAT00, Stage, Recompiled);
             Ins.Parameters[1].SetRegister(PARAM_R, PSH_XBOX_MAX_R_REGISTER_COUNT + inputStage, MASK_R);
-
-            if (bias) {
-                Ins.Parameters[1].Modifiers = (1 << ARGMOD_BIAS);
-            }
 
             Ins.Parameters[2].SetRegister(PARAM_R, PSH_XBOX_MAX_R_REGISTER_COUNT + Stage, MASK_R);
             InsertIns.emplace_back(Ins);
@@ -2987,9 +3053,7 @@ bool PSH_XBOX_SHADER::InsertTextureModeInstruction(XTL::X_D3DPIXELSHADERDEF *pPS
             Ins.Output[0].SetRegister(PARAM_R, 1, MASK_R);
             Ins.Parameters[0].SetScaleBemLumRegister(XTL::D3DTSS_BUMPENVMAT10, Stage, Recompiled);
             Ins.Parameters[1].SetRegister(PARAM_R, PSH_XBOX_MAX_R_REGISTER_COUNT + inputStage, MASK_G);
-            if (bias) {
-                Ins.Parameters[1].Modifiers = (1 << ARGMOD_BIAS);
-            }
+
             Ins.Parameters[2].SetRegister(PARAM_R, 1, MASK_R);
             InsertIns.emplace_back(Ins);
             //
@@ -2997,18 +3061,14 @@ bool PSH_XBOX_SHADER::InsertTextureModeInstruction(XTL::X_D3DPIXELSHADERDEF *pPS
             Ins.Output[0].SetRegister(PARAM_R, 1, MASK_G);
             Ins.Parameters[0].SetScaleBemLumRegister(XTL::D3DTSS_BUMPENVMAT01, Stage, Recompiled);
             Ins.Parameters[1].SetRegister(PARAM_R, PSH_XBOX_MAX_R_REGISTER_COUNT + inputStage, MASK_R);
-            if (bias) {
-                Ins.Parameters[1].Modifiers = (1 << ARGMOD_BIAS);
-            }
+ 
             Ins.Parameters[2].SetRegister(PARAM_R, PSH_XBOX_MAX_R_REGISTER_COUNT + Stage, MASK_G);
             InsertIns.emplace_back(Ins);
             Ins.Initialize(PO_MAD);
             Ins.Output[0].SetRegister(PARAM_R, 1, MASK_G);
             Ins.Parameters[0].SetScaleBemLumRegister(XTL::D3DTSS_BUMPENVMAT11, Stage, Recompiled);
             Ins.Parameters[1].SetRegister(PARAM_R, PSH_XBOX_MAX_R_REGISTER_COUNT + inputStage, MASK_G);
-            if (bias) {
-                Ins.Parameters[1].Modifiers = (1 << ARGMOD_BIAS);
-            }
+
             Ins.Parameters[2].SetRegister(PARAM_R, 1, MASK_G);
             InsertIns.emplace_back(Ins);
 
