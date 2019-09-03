@@ -1782,16 +1782,6 @@ CxbxVertexShaderPatch;
 #define DEF_VSH_END 0xFFFFFFFF
 #define DEF_VSH_NOP 0x00000000
 
-static DWORD VshGetDeclarationCount(DWORD *pDeclaration)
-{
-    DWORD Pos = 0;
-    while (*(pDeclaration + Pos) != DEF_VSH_END)
-    {
-        Pos++;
-    }
-    return Pos + 1;
-}
-
 static inline DWORD VshGetTokenType(DWORD Token)
 {
     return (Token & X_D3DVSD_TOKENTYPEMASK) >> X_D3DVSD_TOKENTYPESHIFT;
@@ -1813,21 +1803,19 @@ static inline WORD VshGetVertexStream(DWORD Token)
 }
 
 static void VshConvertToken_NOP(
-	DWORD *pToken,
-	XTL::D3DVERTEXELEMENT *&pRecompiled
+	DWORD *pToken
 )
 {
     // D3DVSD_NOP
     if(*pToken != DEF_VSH_NOP)
     {
-        EmuLog(LOG_LEVEL::WARNING, "Token NOP found, but extra parameters are given!");
+		EmuLog(LOG_LEVEL::DEBUG, "Token NOP found, but extra parameters are given.");
     }
     DbgVshPrintf("\tD3DVSD_NOP(),\n");
 }
 
 static DWORD VshConvertToken_CONSTMEM(
-	DWORD *pToken,
-	XTL::D3DVERTEXELEMENT *&pRecompiled
+	DWORD *pToken
 )
 {
     using namespace XTL;
@@ -1846,7 +1834,8 @@ static DWORD VshConvertToken_CONSTMEM(
 
 static void VshConvertToken_TESSELATOR(
 	DWORD *pToken,
-	XTL::D3DVERTEXELEMENT *&pRecompiled,
+	std::vector<XTL::D3DVERTEXELEMENT> &xboxToHostVertexElements,
+	//CxbxVertexShaderPatch* pPatchData,
 	boolean IsFixedFunction
 )
 {
@@ -1863,8 +1852,8 @@ static void VshConvertToken_TESSELATOR(
         DbgVshPrintf("),\n");
 
 		// TODO : Expand on the setting of this TESSUV register element :
-		pRecompiled->Usage = D3DDECLUSAGE(NewVertexRegister);
-		pRecompiled->UsageIndex =Index;
+		//pRecompiled->Usage = D3DDECLUSAGE(NewVertexRegister);
+		//pRecompiled->UsageIndex =Index;
 	}
     // D3DVSD_TESSNORMAL
     else
@@ -1878,16 +1867,28 @@ static void VshConvertToken_TESSELATOR(
         DbgVshPrintf("\tD3DVSD_TESSNORMAL(");
         NewVertexRegisterIn = Xb2PCRegisterType(VertexRegisterIn, Index);
         DbgVshPrintf(", ");
+		NewVertexRegisterOut = Xb2PCRegisterType(VertexRegisterOut, Index);
+		DbgVshPrintf("),\n");
+
+		auto inputElement = xboxToHostVertexElements[VertexRegisterIn];
+		auto outputElement = &xboxToHostVertexElements[VertexRegisterOut];
+
+		//outputElement->Stream = inputElement.Stream; // pPatchData->pCurrentVertexShaderStreamInfo->CurrentStreamNumber;
+		//outputElement->Offset = inputElement.Offset + 12;
+		//outputElement->Type = D3DDECLTYPE_FLOAT3;
+		//outputElement->Method = D3DDECLMETHOD_CROSSUV; // generate normals
+		//outputElement->Usage = NewVertexRegisterOut;
+		//outputElement->UsageIndex = Index;
+
 		// TODO : Expand on the setting of this TESSNORMAL input register element :
-		pRecompiled->Usage = D3DDECLUSAGE(NewVertexRegisterIn);
-		pRecompiled->UsageIndex = 0; // TODO : Get Index from Xb2PCRegisterType
-        NewVertexRegisterOut = Xb2PCRegisterType(VertexRegisterOut, Index);
-        DbgVshPrintf("),\n");
+		//pRecompiled->Usage = D3DDECLUSAGE(NewVertexRegisterIn);
+		//pRecompiled->UsageIndex = 0; // TODO : Get Index from Xb2PCRegisterType
+
 
 		// TODO : Expand on the setting of this TESSNORMAL output register element :
-		pRecompiled++;
-		pRecompiled->Usage = D3DDECLUSAGE(NewVertexRegisterOut);
-		pRecompiled->UsageIndex = Index; // TODO : Get Index from Xb2PCRegisterType
+		////pRecompiled++;
+		//pRecompiled->Usage = D3DDECLUSAGE(NewVertexRegisterOut);
+		//pRecompiled->UsageIndex = Index; // TODO : Get Index from Xb2PCRegisterType
 	}
 }
 
@@ -1900,7 +1901,6 @@ static void VshEndPreviousStreamPatch(CxbxVertexShaderPatch *pPatchData)
 
 static void VshConvertToken_STREAM(
 	DWORD          *pToken,
-	XTL::D3DVERTEXELEMENT *&pRecompiled,
 	CxbxVertexShaderPatch *pPatchData
 )
 {
@@ -1918,6 +1918,7 @@ static void VshConvertToken_STREAM(
 
         XTL::DWORD StreamNumber = VshGetVertexStream(*pToken);
 
+		// TODO remove? we don't care about anew stream. we care about register mappings?
         // new stream
 		pPatchData->pCurrentVertexShaderStreamInfo = &(pPatchData->pVertexShaderInfoToSet->VertexStreams[StreamNumber]);
 		pPatchData->pCurrentVertexShaderStreamInfo->NeedPatch = FALSE;
@@ -1938,7 +1939,6 @@ static void VshConvertToken_STREAM(
 
 static void VshConvertToken_STREAMDATA_SKIP(
 	DWORD *pToken,
-	XTL::D3DVERTEXELEMENT *&pRecompiled,
 	CxbxVertexShaderPatch *pPatchData
 )
 {
@@ -1951,7 +1951,6 @@ static void VshConvertToken_STREAMDATA_SKIP(
 
 static void VshConvertToken_STREAMDATA_SKIPBYTES(
 	DWORD *pToken,
-	XTL::D3DVERTEXELEMENT *&pRecompiled,
 	CxbxVertexShaderPatch *pPatchData
 )
 {
@@ -1969,7 +1968,7 @@ static void VshConvertToken_STREAMDATA_SKIPBYTES(
 
 static void VshConvertToken_STREAMDATA_REG(
 	DWORD *pToken,
-	XTL::D3DVERTEXELEMENT *&pRecompiled,
+	std::vector<XTL::D3DVERTEXELEMENT> &xboxToHostVertexElements,
 	boolean IsFixedFunction,
 	CxbxVertexShaderPatch *pPatchData
 )
@@ -2193,6 +2192,9 @@ static void VshConvertToken_STREAMDATA_REG(
 		return;
 	}
 
+	auto hostElement = &xboxToHostVertexElements[VertexRegister];
+	// TODO if not a new register
+
 	// save patching information
 	XTL::CxbxVertexShaderStreamElement *pCurrentElement = &(pPatchData->pCurrentVertexShaderStreamInfo->VertexElements[pPatchData->pCurrentVertexShaderStreamInfo->NumberOfVertexElements]);
 	pCurrentElement->XboxType = XboxVertexElementDataType;
@@ -2200,14 +2202,12 @@ static void VshConvertToken_STREAMDATA_REG(
 	pPatchData->pCurrentVertexShaderStreamInfo->NumberOfVertexElements++;
 	pPatchData->pCurrentVertexShaderStreamInfo->NeedPatch |= NeedPatching;
 
-	pRecompiled->Stream = pPatchData->pCurrentVertexShaderStreamInfo->CurrentStreamNumber;
-	pRecompiled->Offset = pPatchData->pCurrentVertexShaderStreamInfo->HostVertexStride;
-	pRecompiled->Type = HostVertexElementDataType;
-	pRecompiled->Method = D3DDECLMETHOD_DEFAULT;
-	pRecompiled->Usage = HostVertexRegisterType;
-	pRecompiled->UsageIndex = Index;
-
-	pRecompiled++;
+	hostElement->Stream = pPatchData->pCurrentVertexShaderStreamInfo->CurrentStreamNumber;
+	hostElement->Offset = pPatchData->pCurrentVertexShaderStreamInfo->HostVertexStride;
+	hostElement->Type = HostVertexElementDataType;
+	hostElement->Method = D3DDECLMETHOD_DEFAULT;
+	hostElement->Usage = HostVertexRegisterType;
+	hostElement->UsageIndex = Index;
 
     pPatchData->pCurrentVertexShaderStreamInfo->HostVertexStride += HostVertexElementByteSize;
 
@@ -2215,7 +2215,7 @@ static void VshConvertToken_STREAMDATA_REG(
 
 static void VshConvertToken_STREAMDATA(
 	DWORD          *pToken,
-	XTL::D3DVERTEXELEMENT *&pRecompiled,
+	std::vector<XTL::D3DVERTEXELEMENT> &xboxToHostVertexElements,
 	boolean         IsFixedFunction,
 	CxbxVertexShaderPatch *pPatchData
 )
@@ -2225,20 +2225,20 @@ static void VshConvertToken_STREAMDATA(
 	{
 		// For D3D9, use D3DDECLTYPE_UNUSED ?
 		if (*pToken & X_D3DVSD_MASK_SKIPBYTES) {
-			VshConvertToken_STREAMDATA_SKIPBYTES(pToken, pRecompiled, pPatchData);
+			VshConvertToken_STREAMDATA_SKIPBYTES(pToken, pPatchData);
 		} else {
-			VshConvertToken_STREAMDATA_SKIP(pToken, pRecompiled, pPatchData);
+			VshConvertToken_STREAMDATA_SKIP(pToken, pPatchData);
 		}
 	}
 	else // D3DVSD_REG
     {
-        VshConvertToken_STREAMDATA_REG(pToken, pRecompiled, IsFixedFunction, pPatchData);
+        VshConvertToken_STREAMDATA_REG(pToken, xboxToHostVertexElements, IsFixedFunction, pPatchData);
     }
 }
 
 static DWORD VshRecompileToken(
 	DWORD          *pToken,
-	XTL::D3DVERTEXELEMENT *&pRecompiled,
+	std::vector<XTL::D3DVERTEXELEMENT> &xboxToHostVertexElements,
 	boolean         IsFixedFunction,
 	CxbxVertexShaderPatch *pPatchData
 )
@@ -2250,26 +2250,26 @@ static DWORD VshRecompileToken(
     switch(VshGetTokenType(*pToken))
     {
     case X_D3DVSD_TOKEN_NOP:
-        VshConvertToken_NOP(pToken, pRecompiled);
+        VshConvertToken_NOP(pToken);
         break;
     case X_D3DVSD_TOKEN_STREAM:
     {
-        VshConvertToken_STREAM(pToken, pRecompiled, pPatchData);
+        VshConvertToken_STREAM(pToken, pPatchData);
         break;
     }
     case X_D3DVSD_TOKEN_STREAMDATA:
     {
-        VshConvertToken_STREAMDATA(pToken, pRecompiled, IsFixedFunction, pPatchData);
+        VshConvertToken_STREAMDATA(pToken, xboxToHostVertexElements, IsFixedFunction, pPatchData);
         break;
     }
     case X_D3DVSD_TOKEN_TESSELLATOR:
     {
-        VshConvertToken_TESSELATOR(pToken, pRecompiled, IsFixedFunction);
+        VshConvertToken_TESSELATOR(pToken, xboxToHostVertexElements, IsFixedFunction);
         break;
     }
     case X_D3DVSD_TOKEN_CONSTMEM:
     {
-        Step = VshConvertToken_CONSTMEM(pToken, pRecompiled);
+        Step = VshConvertToken_CONSTMEM(pToken);
         break;
     }
     default:
@@ -2290,47 +2290,57 @@ DWORD XTL::EmuRecompileVshDeclaration
     CxbxVertexShaderInfo *pVertexShaderInfo
 )
 {
+	using namespace XTL;
+
 	RegVIsPresentInDeclaration.fill(false);
 
-    // First of all some info:
-    // We have to figure out which flags are set and then
-    // we have to patch their params
-
-    // some token values
-    // 0xFFFFFFFF - end of the declaration
-    // 0x00000000 - nop (means that this value is ignored)
-
-    // Calculate size of declaration
-    DWORD DeclarationCount = VshGetDeclarationCount(pDeclaration);
-	// For Direct3D9, we need to reserve at least twice the number of elements, as one token can generate two registers (in and out) :
-	DWORD HostDeclarationSize = DeclarationCount * sizeof(D3DVERTEXELEMENT) * 2;
-	*pOriginalDeclarationCount = DeclarationCount;
-	*pHostDeclarationSize = HostDeclarationSize;
-	
-	D3DVERTEXELEMENT *pRecompiled = (D3DVERTEXELEMENT *)malloc(HostDeclarationSize);
-	memset(pRecompiled, 0, HostDeclarationSize);
-
-	uint8_t *pRecompiledBufferOverflow = ((uint8_t*)pRecompiled) + HostDeclarationSize;
-    *ppRecompiledDeclaration = pRecompiled;
+	// Store a VertexElement per Xbox Vertex Register
+	std::vector<D3DVERTEXELEMENT> xboxToHostVertexElements(16);
+	for (auto& el : xboxToHostVertexElements) {
+		el.Stream = 0xFF; // consider this unset
+	}
 
 	CxbxVertexShaderPatch PatchData = { 0 };
 	PatchData.pVertexShaderInfoToSet = pVertexShaderInfo;
 
-    DbgVshPrintf("DWORD dwVSHDecl[] =\n{\n");
+	DbgVshPrintf("DWORD dwVSHDecl[] =\n{\n");
 
-    while (*pDeclaration != DEF_VSH_END)
-    {
-		if ((uint8_t*)pRecompiled >= pRecompiledBufferOverflow) {
-			DbgVshPrintf("Detected buffer-overflow, breaking out...\n");
-			break;
-		}
-
-        DWORD Step = VshRecompileToken(pDeclaration, pRecompiled, IsFixedFunction, &PatchData);
-		pDeclaration += Step;
-		//pRecompiled += Step;
+	auto pCurrentToken = pDeclaration;
+	// Translate the Xbox declaration, storing result VertexElements in XboxToHostVertexElements
+	while (*pCurrentToken != DEF_VSH_END)
+	{
+		DWORD Step = VshRecompileToken(pCurrentToken, xboxToHostVertexElements, IsFixedFunction, &PatchData);
+		pCurrentToken += Step;
 	}
 
-	*pRecompiled = D3DDECL_END();
+	// Count how many host vertex elements were set
+	int setElements = 0;
+	for (auto& el : xboxToHostVertexElements) {
+		if (el.Stream != 0xFF)
+			setElements++;
+	}
+
+	// Calculate size of declaration
+	DWORD DeclarationCount = pCurrentToken - pDeclaration + 1; // +1 for DEF_VSH_END
+	DWORD HostDeclarationSize = sizeof(D3DVERTEXELEMENT) * (setElements + 1); // +1 for D3DDECL_END
+	*pOriginalDeclarationCount = DeclarationCount;
+	*pHostDeclarationSize = HostDeclarationSize;
+
+	// Create and fill new host vertex declaration
+	auto pRecompiled = (D3DVERTEXELEMENT*) malloc(HostDeclarationSize);
+
+
+	int index = 0;
+	for (int stream = 0; stream < 16; stream++) {
+		for (auto& el : xboxToHostVertexElements) {
+			if (el.Stream == stream)
+				pRecompiled[index++] = el;
+		}
+	}
+
+	pRecompiled[index] = D3DDECL_END();
+
+	*ppRecompiledDeclaration = pRecompiled;
 
 	VshEndPreviousStreamPatch(&PatchData);
     DbgVshPrintf("\tD3DVSD_END()\n};\n");
