@@ -2248,32 +2248,24 @@ static DWORD VshRecompileToken(
 
     switch(VshGetTokenType(*pToken))
     {
-    case X_D3DVSD_TOKEN_NOP:
-        VshConvertToken_NOP(pToken);
-        break;
-    case X_D3DVSD_TOKEN_STREAM:
-    {
-        VshConvertToken_STREAM(pToken, pPatchData);
-        break;
-    }
-    case X_D3DVSD_TOKEN_STREAMDATA:
-    {
-        VshConvertToken_STREAMDATA(pToken, xboxToHostVertexElements, IsFixedFunction, pPatchData);
-        break;
-    }
-    case X_D3DVSD_TOKEN_TESSELLATOR:
-    {
-        VshConvertToken_TESSELATOR(pToken, xboxToHostVertexElements, IsFixedFunction);
-        break;
-    }
-    case X_D3DVSD_TOKEN_CONSTMEM:
-    {
-        Step = VshConvertToken_CONSTMEM(pToken);
-        break;
-    }
-    default:
-        DbgVshPrintf("Unknown token type: %d\n", VshGetTokenType(*pToken));
-        break;
+		case X_D3DVSD_TOKEN_NOP:
+			VshConvertToken_NOP(pToken);
+			break;
+		case X_D3DVSD_TOKEN_STREAM:
+			VshConvertToken_STREAM(pToken, pPatchData);
+			break;
+		case X_D3DVSD_TOKEN_STREAMDATA:
+			VshConvertToken_STREAMDATA(pToken, xboxToHostVertexElements, IsFixedFunction, pPatchData);
+			break;
+		case X_D3DVSD_TOKEN_TESSELLATOR:
+			VshConvertToken_TESSELATOR(pToken, xboxToHostVertexElements, IsFixedFunction);
+			break;
+		case X_D3DVSD_TOKEN_CONSTMEM:
+			Step = VshConvertToken_CONSTMEM(pToken);
+			break;
+		default:
+			DbgVshPrintf("Unknown token type: %d\n", VshGetTokenType(*pToken));
+			break;
     }
 
     return Step;
@@ -2328,7 +2320,7 @@ DWORD XTL::EmuRecompileVshDeclaration
 	// Create and fill new host vertex declaration
 	auto pRecompiled = (D3DVERTEXELEMENT*) malloc(HostDeclarationSize);
 
-
+	// TODO remove hack - gather elements one at a time
 	int index = 0;
 	for (int stream = 0; stream < 16; stream++) {
 		for (auto& el : xboxToHostVertexElements) {
