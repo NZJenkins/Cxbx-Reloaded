@@ -1922,7 +1922,6 @@ static void VshConvertToken_STREAM(
         // new stream
 		pPatchData->pCurrentVertexShaderStreamInfo = &(pPatchData->pVertexShaderInfoToSet->VertexStreams[StreamNumber]);
 		pPatchData->pCurrentVertexShaderStreamInfo->NeedPatch = FALSE;
-		pPatchData->pCurrentVertexShaderStreamInfo->DeclPosition = FALSE;
 		pPatchData->pCurrentVertexShaderStreamInfo->CurrentStreamNumber = 0;
 		pPatchData->pCurrentVertexShaderStreamInfo->HostVertexStride = 0;
 		pPatchData->pCurrentVertexShaderStreamInfo->NumberOfVertexElements = 0;
