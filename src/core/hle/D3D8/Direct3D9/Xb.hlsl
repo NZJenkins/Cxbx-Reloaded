@@ -89,12 +89,12 @@ float4 x_slt(float4 src0, float4 src1) {
 // Xbox ILU Functions
 
 float x_rcp(float4 src0) {
-	return 1 / src0.w; // use w component by default
+	return 1 / src0.x;
 }
 
 // Clamped reciprocal
 float x_rcc(float4 src0) {
-	float input = src0.w; // use w component by default
+	float input = src0.x;
 
 	// Calculate the reciprocal
 	float r = 1.0f / input;
@@ -106,11 +106,11 @@ float x_rcc(float4 src0) {
 }
 
 float x_rsq(float4 src0) {
-	return rsqrt(src0.w); // use w component by default
+	return rsqrt(src0.x);
 }
 
 float4 x_exp(float4 src0) {
-	float input = src0.w; // use w component by default
+	float input = src0.x;
 	float x = exp2(floor(input));
 	float fractional = frac(input);
 	float power = exp2(input);
@@ -118,7 +118,7 @@ float4 x_exp(float4 src0) {
 }
 
 float4 x_log(float4 src0) {
-	float input = src0.w; // use w component by default
+	float input = src0.x;
 	float exponent = floor(log2(input));
 	float mantissa = 1 / exp2(exponent);
 	float logResult = log2(input);
