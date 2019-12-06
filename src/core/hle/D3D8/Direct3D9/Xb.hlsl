@@ -22,7 +22,11 @@ struct VS_OUTPUT
 };
 
 // Constant registers
-extern float4 hostConstants[192];
+extern float4 hostConstants[192] : register(c0);
+
+// Vertex input overrides for SetVertexData4f support
+extern float4 vOverrideValue[16] : register(c192);
+extern float  vOverride[16] : register(c208);
 
 // Map Xbox [-96, 95] to Host [0, 191]
 // Account for Xbox's negative constant indexes
@@ -158,9 +162,6 @@ float4 reverseScreenspaceTransform(float4 oPos) {
 
 VS_OUTPUT main(const VS_INPUT xIn)
 {
-	// Input registers
-	float4 v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, v13, v14, v15;
-
 	// Temporary variables
 	float4 r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11;
 	r0 = r1 = r2 = r3 = r4 = r5 = r6 = r7 = r8 = r9 = r10 = r11 = float4(0, 0, 0, 1); // TODO correct?
@@ -178,23 +179,30 @@ VS_OUTPUT main(const VS_INPUT xIn)
 	float4 oFog, oPts;
 	oFog = oPts = 0;
 
-	// Initialize input variables
-	v0 = xIn.v[0];
-	v1 = xIn.v[1];
-	v2 = xIn.v[2];
-	v3 = xIn.v[3];
-	v4 = xIn.v[4];
-	v5 = xIn.v[5];
-	v6 = xIn.v[6];
-	v7 = xIn.v[7];
-	v8 = xIn.v[8];
-	v9 = xIn.v[9];
-	v10 = xIn.v[10];
-	v11 = xIn.v[11];
-	v12 = xIn.v[12];
-	v13 = xIn.v[13];
-	v14 = xIn.v[14];
-	v15 = xIn.v[15];
+	// Xbox Input registers
+    float4 v[16];
+    # define v0  v[0]
+    # define v1  v[1]
+    # define v2  v[2]
+    # define v3  v[3]
+    # define v4  v[4]
+    # define v5  v[5]
+    # define v6  v[6]
+    # define v7  v[7]
+    # define v8  v[8]
+    # define v9  v[9]
+    # define v10 v[10]
+    # define v11 v[11]
+    # define v12 v[12]
+    # define v13 v[13]
+    # define v14 v[14]
+    # define v15 v[15]
+
+	// Initialize input registers from the vertex buffer
+	// or an override if any
+	for(uint i = 0; i < 16; i++){
+		v[i] = vOverride[i] ? vOverrideValue[i] : xIn.v[i];
+	}
 
 	// Insert Xbox shader here
 
@@ -203,7 +211,7 @@ VS_OUTPUT main(const VS_INPUT xIn)
 	// Copy variables to output struct
 	VS_OUTPUT xOut;
 
-	xOut.oPos = reverseScreenspaceTransform(oPos);
+	xOut.oPos = oPos;
 	xOut.oD0 = oD0;
 	xOut.oD1 = oD1;
 	xOut.oFog = oFog;

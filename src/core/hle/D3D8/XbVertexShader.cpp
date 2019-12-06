@@ -1524,6 +1524,10 @@ static boolean VshConvertShader(VSH_XBOX_SHADER *pShader,
         VshRemoveScreenSpaceInstructions(pShader);
     }
 
+	// Just clean up the screen space instructions
+	return true;
+
+
 	// Windows does not support back-facing colours, so we remove them from the shaders
 	// Test Case: Panzer Dragoon Orta
 	VshRemoveUnsupportedObRegisters(pShader);
@@ -2509,6 +2513,12 @@ public:
 		// Free the preprocessed declaration copy
 		free(pXboxVertexDeclarationCopy);
 
+		for (int i = 0; i < RegVIsPresentInDeclaration.size(); i++) {
+			pCxbxVertexShaderInfo->vRegisterInDeclaration[i] = RegVIsPresentInDeclaration[i];
+
+				EmuLog(LOG_LEVEL::DEBUG, "v%d %d", i, pCxbxVertexShaderInfo->vRegisterInDeclaration[i]);
+		}
+
 		return Result;
 	}
 };
@@ -2775,15 +2785,16 @@ extern HRESULT EmuRecompileVshFunction
 		DbgVshPrintf("%s", pXboxShaderDisassembly.str().c_str());
 		DbgVshPrintf("-----------------------\n");
 
+
+		VshConvertShader(pShader, bNoReservedConstants);
+		VshWriteShader(pShader, pHostShaderDisassembly, pRecompiledDeclaration, TRUE);
+
 		auto hlslTest = BuildShader(pShader);
 		hlslTest = std::regex_replace(hlslTemplate, std::regex("// <Xbox Shader>"), hlslTest);
-
 		DbgVshPrintf("-- HLSL conversion 1 ---\n");
 		DbgVshPrintf(DebugPrependLineNumbers(hlslTest).c_str());
 		DbgVshPrintf("-----------------------\n");
 
-		VshConvertShader(pShader, bNoReservedConstants);
-		VshWriteShader(pShader, pHostShaderDisassembly, pRecompiledDeclaration, TRUE);
 
 		//auto hlslTest = BuildShader(pShader);
 		//hlslTest = std::regex_replace(hlslTemplate, std::regex("// <Xbox Shader>"), hlslTest);
