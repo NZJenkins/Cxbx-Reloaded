@@ -26,7 +26,7 @@ extern float4 hostConstants[192] : register(c0);
 
 // Vertex input overrides for SetVertexData4f support
 extern float4 vOverrideValue[16] : register(c192);
-extern float  vOverride[16] : register(c208);
+extern float4  vOverridePacked[4] : register(c208);
 
 // Map Xbox [-96, 95] to Host [0, 191]
 // Account for Xbox's negative constant indexes
@@ -197,6 +197,9 @@ VS_OUTPUT main(const VS_INPUT xIn)
     # define v13 v[13]
     # define v14 v[14]
     # define v15 v[15]
+
+	// View 4 packed overrides as an array of 16 floats
+	float vOverride[16] = (float[16])vOverridePacked;
 
 	// Initialize input registers from the vertex buffer
 	// or an override if any
