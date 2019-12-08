@@ -450,6 +450,18 @@ const char *CxbxGetErrorDescription(HRESULT hResult)
 	return nullptr;
 }
 
+// TODO move to shader file. Needs to be called whenever a shader or declaration is set
+void SetOverrideFlags(CxbxVertexShader* pCxbxVertexShader) {
+	if (pCxbxVertexShader != nullptr && pCxbxVertexShader->pHostVertexShader != nullptr) {
+		float overrideFlags[16];
+		for (int i = 0; i < 16; i++) {
+			// If this is hardcoded to false, things are mostly fine..?
+			overrideFlags[i] = !pCxbxVertexShader->VertexShaderInfo.vRegisterInDeclaration[i];
+		}
+		g_pD3DDevice->SetVertexShaderConstantF(X_D3DVS_CONSTREG_VERTEXDATA4F_FLAG_BASE, overrideFlags, 4);
+	}
+}
+
 const char *D3DErrorString(HRESULT hResult)
 {
 	static char buffer[1024];
@@ -3328,6 +3340,8 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_SelectVertexShader)
 		pHostVertexDeclaration = pCxbxVertexShader->pHostVertexDeclaration;
 		pHostVertexShader = pCxbxVertexShader->pHostVertexShader;
 		HostFVF = pCxbxVertexShader->HostFVF;
+
+		SetOverrideFlags(pCxbxVertexShader);
 	}
 
 	hRet = g_pD3DDevice->SetVertexDeclaration(pHostVertexDeclaration);
@@ -3669,29 +3683,69 @@ void GetViewPortOffsetAndScale(float (&vOffset)[4], float(&vScale)[4])
     float scaleZ = zScale * (ViewPort.MaxZ - ViewPort.MinZ);
     float offsetZ = zScale * ViewPort.MinZ;
 
-    vOffset[0] = offsetWidth + ViewPort.X;
-    vOffset[1] = offsetHeight + ViewPort.Y;
-    vOffset[2] = offsetZ;
-    vOffset[3] = 0.0f;
+	// TODO will we need to do something here to support upscaling?
+	// TODO remove the code above as required
 
-    vScale[0] = scaleWidth;
-    vScale[1] = scaleHeight;
-    vScale[2] = scaleZ;
-    vScale[3] = 0.0f;
+	// Default scale and offset.
+	// Multisample state will affect these
+	float xScale = 1;
+	float yScale = 1;
+	float xOffset = 0.5;
+	float yOffset = 0.5;
+
+	//if (g_EmuCDPD.XboxPresentationParameters.MultiSampleType != XTL::X_D3DMULTISAMPLE_NONE)
+	//	LOG_TEST_CASE("Xbox multisample type was not NONE");
+
+	// TODO this switch statement is pretty hard to follow
+	// Separate offset special cases from scale ones
+	// MULTISAMPLE options have offset of 0
+	// Various sample sizes have various x and y scales
+	switch (g_EmuCDPD.XboxPresentationParameters.MultiSampleType) {
+	case XTL::X_D3DMULTISAMPLE_2_SAMPLES_MULTISAMPLE_LINEAR:
+	case XTL::X_D3DMULTISAMPLE_2_SAMPLES_MULTISAMPLE_QUINCUNX:
+	case XTL::X_D3DMULTISAMPLE_4_SAMPLES_MULTISAMPLE_LINEAR:
+	case XTL::X_D3DMULTISAMPLE_4_SAMPLES_MULTISAMPLE_GAUSSIAN:
+		xOffset = yOffset = 0;
+		break;
+	case XTL::X_D3DMULTISAMPLE_2_SAMPLES_SUPERSAMPLE_HORIZONTAL_LINEAR:
+		xScale = 2;
+		break;
+	case XTL::X_D3DMULTISAMPLE_2_SAMPLES_SUPERSAMPLE_VERTICAL_LINEAR:
+		yScale = 2;
+		break;
+	case XTL::X_D3DMULTISAMPLE_4_SAMPLES_SUPERSAMPLE_LINEAR:
+	case XTL::X_D3DMULTISAMPLE_4_SAMPLES_SUPERSAMPLE_GAUSSIAN:
+		xScale = yScale = 2;
+		break;
+	case XTL::X_D3DMULTISAMPLE_9_SAMPLES_MULTISAMPLE_GAUSSIAN:
+		xScale = yScale = 1.5f;
+		xOffset = yOffset = 0;
+		break;
+	case XTL::X_D3DMULTISAMPLE_9_SAMPLES_SUPERSAMPLE_GAUSSIAN:
+		xScale = yScale = 3.0f;
+		break;
+	}
+
+	// Offset with OGL pixel correction (?) TODO verify
+	vOffset[0] = xOffset + (2.0f / ViewPort.Width);
+	vOffset[1] = yOffset + (2.0f / ViewPort.Height);
+	vOffset[2] = 0; //offsetZ;
+	vOffset[3] = 0.0f;
+
+	// Scale
+    vScale[0] = xScale * ViewPort.Width;
+    vScale[1] = yScale * ViewPort.Height;
+    vScale[2] = scaleZ; // ?
+    vScale[3] = 1.0f; // ?
 }
 
 void UpdateViewPortOffsetAndScaleConstants()
 {
     float vOffset[4], vScale[4];
     GetViewPortOffsetAndScale(vOffset, vScale);
-    float vScaleReversed[4] = { 1.0f / (double)vScale[0], 1.0f / (double)vScale[1], 1.0f / (double)vScale[2], 0 };
 
-	g_pD3DDevice->SetVertexShaderConstantF(X_D3DVS_VIEWPORT_SCALE_MIRROR_INVERTED, vScaleReversed, 1);
-    g_pD3DDevice->SetVertexShaderConstantF(X_D3DVS_VIEWPORT_OFFSET_MIRROR, vOffset, 1);
-
-    // Set 0 and 1 constant, used to compare and transform W when required
-    float ZeroOne[] = { 0, 1, 0, 0 };
-    g_pD3DDevice->SetVertexShaderConstantF(X_D3DVS_VIEWPORT_SCALE_ZERO_ONE, ZeroOne, 1);
+	g_pD3DDevice->SetVertexShaderConstantF(X_D3DVS_VIEWPORT_SCALE_MIRROR, vScale, 1);
+	g_pD3DDevice->SetVertexShaderConstantF(X_D3DVS_VIEWPORT_OFFSET_MIRROR, vOffset, 1);
 
 	// Store viewport offset and scale in constant registers 58 (c-38) and
 	// 59 (c-37) used for screen space transformation.
@@ -3944,10 +3998,10 @@ HRESULT WINAPI XTL::EMUPATCH(D3DDevice_CreateVertexShader)
 	D3DVERTEXELEMENT *pRecompiledDeclaration = nullptr;
 
 	pRecompiledDeclaration = EmuRecompileVshDeclaration((DWORD*)pDeclaration,
-                                                   /*bIsFixedFunction=*/pFunction == xbnullptr,
-                                                   &XboxDeclarationCount,
-                                                   &HostDeclarationSize,
-                                                   &pCxbxVertexShader->VertexShaderInfo);
+		/*bIsFixedFunction=*/pFunction == xbnullptr,
+		&XboxDeclarationCount,
+		&HostDeclarationSize,
+		&pCxbxVertexShader->VertexShaderInfo);
 
 	// Create the vertex declaration
 	hRet = g_pD3DDevice->CreateVertexDeclaration(pRecompiledDeclaration, &pCxbxVertexShader->pHostVertexDeclaration);
@@ -6547,18 +6601,12 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_SetVertexShader)
 		}
 		else
 		{
+			SetOverrideFlags(pCxbxVertexShader);
+
 			hRet = g_pD3DDevice->SetVertexShader(pCxbxVertexShader->pHostVertexShader);
 			DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetVertexShader(VshHandleIsVertexShader)");
 		}
 
-		// Set default constant values for specular, diffuse, etc
-		static const float ColorBlack[4] = { 0,0,0,0 };
-		static const float ColorWhite[4] = { 1,1,1,1 };
-
-		g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_CONSTREG_VERTEXDATA4F_BASE + XTL::X_D3DVSDE_DIFFUSE, ColorWhite, 1);
-		g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_CONSTREG_VERTEXDATA4F_BASE + XTL::X_D3DVSDE_BACKDIFFUSE, ColorWhite, 1);
-		g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_CONSTREG_VERTEXDATA4F_BASE + XTL::X_D3DVSDE_SPECULAR, ColorBlack, 1);
-		g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_CONSTREG_VERTEXDATA4F_BASE + XTL::X_D3DVSDE_BACKSPECULAR, ColorBlack, 1);
 	} else {
 		hRet = g_pD3DDevice->SetVertexShader(nullptr);
 		DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetVertexShader");

@@ -2509,6 +2509,11 @@ public:
 		// Free the preprocessed declaration copy
 		free(pXboxVertexDeclarationCopy);
 
+		for (int i = 0; i < RegVIsPresentInDeclaration.size(); i++) {
+			pCxbxVertexShaderInfo->vRegisterInDeclaration[i] = RegVIsPresentInDeclaration[i];
+			EmuLog(LOG_LEVEL::DEBUG, "Vertex regs used: v%d %d", i, pCxbxVertexShaderInfo->vRegisterInDeclaration[i]);
+		}
+
 		return Result;
 	}
 };
