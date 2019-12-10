@@ -3051,12 +3051,22 @@ std::string ToHlsl(VSH_IMD_PARAMETER& paramMeta)
 
 std::string ToHlsl(std::string pattern, VSH_INTERMEDIATE_FORMAT& instruction) {
 	auto static regDest = std::regex("dest");
+	auto static regMask = std::regex("\\.mask");
 	const std::regex regSrc[] = { std::regex("src0"), std::regex("src1"), std::regex("src2") };
 
 	// TODO use simple string replace
 	// Warn if we didn't replace anything etc.
 	// Replace dest
-	auto hlsl = std::regex_replace(pattern, regDest, ToHlsl(instruction.Output));
+	auto destHlsl = ToHlsl(instruction.Output);
+	auto hlsl = std::regex_replace(pattern, regDest, destHlsl);
+
+	auto maskIndex = destHlsl.find(".");
+	if (maskIndex != std::string::npos) {
+		hlsl = std::regex_replace(hlsl, regMask, destHlsl.substr(maskIndex));
+	}
+	else {
+		hlsl = std::regex_replace(hlsl, regMask, "");
+	}
 
 	int srcNum = 0;
 	for (int i = 0; i < 3; i++) { // TODO remove magic number
@@ -3074,18 +3084,18 @@ std::string BuildShader(VSH_XBOX_SHADER* pShader) {
 	// HLSL strings for all MAC opcodes, indexed with VSH_MAC
 	static std::string VSH_MAC_HLSL[] = {
 		/*MAC_NOP:*/"// MAC_NOP\n",
-		/*MAC_MOV:*/"dest = x_mov(src0);\n",
-		/*MAC_MUL:*/"dest = x_mul(src0, src1);\n",
-		/*MAC_ADD:*/"dest = x_add(src0, src1);\n",
-		/*MAC_MAD:*/"dest = x_mad(src0, src1, src2);\n",
-		/*MAC_DP3:*/"dest = x_dp3(src0, src1);\n",
-		/*MAC_DPH:*/"dest = x_dph(src0, src1);\n",
-		/*MAC_DP4:*/"dest = x_dp4(src0, src1);\n",
-		/*MAC_DST:*/"dest = x_dst(src0, src1);\n",
-		/*MAC_MIN:*/"dest = x_min(src0, src1);\n",
-		/*MAC_MAX:*/"dest = x_max(src0, src1);\n",
-		/*MAC_SLT:*/"dest = x_slt(src0, src1);\n",
-		/*MAC_SGE:*/"dest = x_sge(src0, src1);\n",
+		/*MAC_MOV:*/"dest = x_mov(src0).mask;\n",
+		/*MAC_MUL:*/"dest = x_mul(src0, src1).mask;\n",
+		/*MAC_ADD:*/"dest = x_add(src0, src1).mask;\n",
+		/*MAC_MAD:*/"dest = x_mad(src0, src1, src2).mask;\n",
+		/*MAC_DP3:*/"dest = x_dp3(src0, src1).mask;\n",
+		/*MAC_DPH:*/"dest = x_dph(src0, src1).mask;\n",
+		/*MAC_DP4:*/"dest = x_dp4(src0, src1).mask;\n",
+		/*MAC_DST:*/"dest = x_dst(src0, src1).mask;\n",
+		/*MAC_MIN:*/"dest = x_min(src0, src1).mask;\n",
+		/*MAC_MAX:*/"dest = x_max(src0, src1).mask;\n",
+		/*MAC_SLT:*/"dest = x_slt(src0, src1).mask;\n",
+		/*MAC_SGE:*/"dest = x_sge(src0, src1).mask;\n",
 		/*MAC_ARL:*/"a = x_arl(src0);\n", // Note : For this MAC_ARL case, ToHlsl would always replace 'dest' with 'a', so we optimized this upfront
 		"// ??? VSH_MAC 14 ???;\n",
 		"// ??? VSH_MAC 15 ???;\n" // VSH_MAC 2 final values of the 4 bits are undefined/unknown  TODO : Investigate their effect (if any) and emulate that as well
@@ -3094,13 +3104,13 @@ std::string BuildShader(VSH_XBOX_SHADER* pShader) {
 	// HLSL strings for all ILU opcodes, indexed with VSH_ILU
 	static std::string VSH_ILU_HLSL[] = {
 		/*ILU_NOP:*/"// ILU_NOP\n",
-		/*ILU_MOV:*/"dest = x_mov(src0);\n",
-		/*ILU_RCP:*/"dest = x_rcp(src0);\n",
-		/*ILU_RCC:*/"dest = x_rcc(src0);\n",
-		/*ILU_RSQ:*/"dest = x_rsq(src0);\n",
-		/*ILU_EXP:*/"dest = x_exp(src0);\n",
-		/*ILU_LOG:*/"dest = x_log(src0);\n",
-		/*ILU_LIT:*/"dest = x_lit(src0);\n" // = 7 - all values of the 3 bits are used
+		/*ILU_MOV:*/"dest = x_mov(src0).mask;\n",
+		/*ILU_RCP:*/"dest = x_rcp(src0).mask;\n",
+		/*ILU_RCC:*/"dest = x_rcc(src0).mask;\n",
+		/*ILU_RSQ:*/"dest = x_rsq(src0).mask;\n",
+		/*ILU_EXP:*/"dest = x_exp(src0).mask;\n",
+		/*ILU_LOG:*/"dest = x_log(src0).mask;\n",
+		/*ILU_LIT:*/"dest = x_lit(src0).mask;\n" // = 7 - all values of the 3 bits are used
 	};
 
 	auto hlsl = std::stringstream();

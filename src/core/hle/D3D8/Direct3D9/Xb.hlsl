@@ -42,15 +42,15 @@ float4 c(int index) {
 }
 
 // Generic macros
-#define x_mov(src0) src0
+#define x_mov(src0) ((float4)src0)
 
 // Macros for MAC ('Multiply And Accumulate') opcodes
-#define x_mul(src0, src1) src0 * src1
-#define x_add(src0, src1) src0 + src1
-#define x_dst(src0, src1) dst(src0, src1)
-#define x_min(src0, src1) min(src0, src1)
-#define x_max(src0, src1) max(src0, src1)
-#define x_mad(src0, src1, src2) src0 * src1 + src2
+#define x_mul(src0, src1) ((float4)(src0 * src1))
+#define x_add(src0, src1) ((float4)(src0 + src1))
+#define x_dst(src0, src1) ((float4)dst(src0, src1))
+#define x_min(src0, src1) ((float4)min(src0, src1))
+#define x_max(src0, src1) ((float4)max(src0, src1))
+#define x_mad(src0, src1, src2) ((float4)(src0 * src1 + src2))
 
 // Xbox MAC functions
 int x_arl(float src0) {
@@ -63,15 +63,15 @@ int x_arl(float src0) {
 }
 
 
-float x_dp3(float4 src0, float4 src1) {
+float4 x_dp3(float4 src0, float4 src1) {
 	return dot(src0.xyz, src1.xyz);
 }
 
-float x_dph(float4 src0, float4 src1) {
+float4 x_dph(float4 src0, float4 src1) {
 	return x_dp3(src0, src1) + src1.w;
 }
 
-float x_dp4(float4 src0, float4 src1) {
+float4 x_dp4(float4 src0, float4 src1) {
 	return dot(src0, src1);
 }
 
@@ -95,12 +95,12 @@ float4 x_slt(float4 src0, float4 src1) {
 
 // Xbox ILU Functions
 
-float x_rcp(float4 src0) {
+float4 x_rcp(float4 src0) {
 	return 1 / src0.x;
 }
 
 // Clamped reciprocal
-float x_rcc(float4 src0) {
+float4 x_rcc(float4 src0) {
 	float input = src0.x;
 
 	// Calculate the reciprocal
@@ -112,7 +112,7 @@ float x_rcc(float4 src0) {
 		: clamp(r, -1.84467e+019, -5.42101e-020);
 }
 
-float x_rsq(float4 src0) {
+float4 x_rsq(float4 src0) {
 	return rsqrt(src0.x);
 }
 
