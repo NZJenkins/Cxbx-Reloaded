@@ -27,6 +27,7 @@
 
 #include <d3dcompiler.h>
 #include <vector>
+#include <future>
 
 #include "core\hle\D3D8\XbD3D8Types.h" // for X_VSH_MAX_ATTRIBUTES
 
@@ -75,6 +76,14 @@ typedef struct _CxbxVertexShaderInfo
 }
 CxbxVertexShaderInfo;
 
+// TODO move D3D9 specific struct
+struct DeferredVertexShader {
+	bool isReady = false;
+	IDirect3DVertexShader* pHostVertexShader = nullptr;
+	//uint64_t xboxShaderId = 0;
+	std::future<ID3DBlob*> pCompiledShader;
+};
+
 typedef struct _CxbxVertexShader
 {
 	// These are the parameters given by the XBE,
@@ -89,7 +98,7 @@ typedef struct _CxbxVertexShader
 
 	// The resulting host variables
 	DWORD HostFVF; // Flexible Vertex Format (used when there's no host vertex shader)
-	IDirect3DVertexShader* pHostVertexShader; // if nullptr, use SetFVF(HostFVF);
+	DeferredVertexShader HostVertexShader; // if nullptr, use SetFVF(HostFVF);
 	IDirect3DVertexDeclaration* pHostVertexDeclaration;
 
 	// Needed for dynamic stream patching
@@ -216,7 +225,7 @@ typedef struct _IntermediateVertexShader {
 } IntermediateVertexShader;
 
 // parse xbox vertex shader function into an intermediate format
-extern HRESULT EmuParseVshFunction
+extern void EmuParseVshFunction
 (
 	DWORD* pXboxFunction,
 	DWORD* pXboxFunctionSize,
