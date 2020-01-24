@@ -4260,15 +4260,15 @@ HRESULT WINAPI XTL::EMUPATCH(D3DDevice_CreateVertexShader)
 	{
 		bool bUseDeclarationOnly = false;
 
-		auto          pIntermediateShader = &IntermediateVertexShader();
+		auto intermediateShader = IntermediateVertexShader();
 
 		// TOOD handle parse return value?
 		hRet = EmuParseVshFunction((DWORD*)pFunction,
 			&XboxFunctionSize,
-			pIntermediateShader);
+			&intermediateShader);
 
 		hRet = EmuCompileShader(
-			pIntermediateShader,
+			&intermediateShader,
 			/*bNoReservedConstants=*/g_Xbox_VertexShaderConstantMode == X_D3DSCM_NORESERVEDCONSTANTS,
 			&bUseDeclarationOnly,
 			&pRecompiledBuffer
