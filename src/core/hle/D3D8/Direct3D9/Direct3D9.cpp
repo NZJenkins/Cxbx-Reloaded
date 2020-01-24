@@ -859,6 +859,8 @@ typedef std::unordered_map<resource_key_t, resource_info_t, resource_key_hash> r
 resource_cache_t g_Cxbx_Cached_Direct3DResources;
 resource_cache_t g_Cxbx_Cached_PaletizedTextures;
 
+std::unordered_map<uint64_t, ID3DBlob*> g_Cxbx_Cached_VertexShaders = {};
+
 bool IsResourceAPixelContainer(XTL::DWORD XboxResource_Common)
 {
 	DWORD Type = GetXboxCommonResourceType(XboxResource_Common);
@@ -4266,10 +4268,35 @@ HRESULT WINAPI XTL::EMUPATCH(D3DDevice_CreateVertexShader)
 			&intermediateShader);
 
 		// Try to compile the shader
-		hRet = EmuCompileShader(
-			&intermediateShader,
-			&pRecompiledBuffer
-		);
+		bool cacheEnabled = true;
+
+		auto hash = ComputeHash((void*)pFunction, XboxFunctionSize);
+		if (cacheEnabled) {
+			auto iter = g_Cxbx_Cached_VertexShaders.find(hash);
+
+			if (iter == g_Cxbx_Cached_VertexShaders.end()) {
+				EmuLog(LOG_LEVEL::FATAL, "Compiling shader with hash %llu size %d", hash, XboxFunctionSize);
+				hRet = EmuCompileShader(
+					&intermediateShader,
+					&pRecompiledBuffer
+				);
+
+				if (SUCCEEDED(hRet)) {
+					g_Cxbx_Cached_VertexShaders[hash] = pRecompiledBuffer;
+				}
+			}
+			else {
+				EmuLog(LOG_LEVEL::FATAL, "Loading cached shader with hash %llu size %d", hash, XboxFunctionSize);
+				pRecompiledBuffer = iter->second;
+			}
+		}
+		else {
+			EmuLog(LOG_LEVEL::FATAL, "Compiling shader with hash %llu size %d", hash, XboxFunctionSize);
+			hRet = EmuCompileShader(
+				&intermediateShader,
+				&pRecompiledBuffer
+			);
+		}
 
 		if (SUCCEEDED(hRet))
 		{
@@ -4298,11 +4325,6 @@ HRESULT WINAPI XTL::EMUPATCH(D3DDevice_CreateVertexShader)
 		DEBUG_D3DRESULT(hRet, "g_pD3DDevice->CreateVertexShader");
 	}
 
-	if (pRecompiledBuffer != nullptr)
-	{
-		pRecompiledBuffer->Release();
-		pRecompiledBuffer = nullptr;
-	}
 
     free(pRecompiledDeclaration);
 
