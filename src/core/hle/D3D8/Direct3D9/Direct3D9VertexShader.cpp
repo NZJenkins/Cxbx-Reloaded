@@ -39,7 +39,7 @@ void OutputHlsl(std::stringstream& hlsl, VSH_IMD_OUTPUT& dest)
 		hlsl << "r" << dest.Address;
 		break;
 	case IMD_OUTPUT_O:
-		assert(dest.Address < OREG_A0X);
+		assert(dest.Address < 16);
 		hlsl << OReg_Name[dest.Address];
 		break;
 	case IMD_OUTPUT_A0X:
