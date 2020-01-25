@@ -62,7 +62,7 @@ namespace xboxkrnl
 #include "core\kernel\common\strings.hpp" // For uem_str
 #include "common\input\SdlJoystick.h"
 #include "common/util/strConverter.hpp" // for utf8_to_utf16
-#include "Direct3D9VertexShader.h"
+#include "VertexShader.h"
 
 #include <assert.h>
 #include <process.h>

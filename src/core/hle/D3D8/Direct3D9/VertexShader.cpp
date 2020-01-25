@@ -1,6 +1,6 @@
 #define LOG_PREFIX CXBXR_MODULE::VTXSH
 
-#include "Direct3D9VertexShader.h"
+#include "VertexShader.h"
 #include "core\kernel\init\CxbxKrnl.h"
 #include "core\kernel\support\Emu.h"
 
