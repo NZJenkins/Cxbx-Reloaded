@@ -53,25 +53,6 @@ class XboxVertexShaderDecoder
 private:
 	// Xbox Vertex SHader microcode types
 
-	enum VSH_OREG_NAME {
-		OREG_OPOS,    //  0
-		OREG_UNUSED1, //  1
-		OREG_UNUSED2, //  2
-		OREG_OD0,     //  3
-		OREG_OD1,     //  4
-		OREG_OFOG,    //  5
-		OREG_OPTS,    //  6
-		OREG_OB0,     //  7
-		OREG_OB1,     //  8
-		OREG_OT0,     //  9
-		OREG_OT1,     // 10
-		OREG_OT2,     // 11
-		OREG_OT3,     // 12
-		OREG_UNUSED3, // 13
-		OREG_UNUSED4, // 14
-		OREG_A0X      // 15 - all values of the 4 bits are used
-	};
-
 	enum VSH_OUTPUT_TYPE {
 		OUTPUT_C = 0,
 		OUTPUT_O
