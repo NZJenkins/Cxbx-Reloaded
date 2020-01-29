@@ -547,11 +547,10 @@ const char *CxbxGetErrorDescription(HRESULT hResult)
 	return nullptr;
 }
 
-IDirect3DVertexShader9* GetHostShader(CxbxVertexShader* shader);
 // TODO move to shader file. Needs to be called whenever a shader or declaration is set
 void SetOverrideFlags(CxbxVertexShader* pCxbxVertexShader) {
 	EmuLog(LOG_LEVEL::FATAL, "Blocking for shader!");
-	if (pCxbxVertexShader != nullptr && GetHostShader(pCxbxVertexShader) != nullptr) {
+	if (pCxbxVertexShader != nullptr && pCxbxVertexShader->HostVertexShader.get(g_pD3DDevice) != nullptr) {
 		float overrideFlags[16];
 		for (int i = 0; i < 16; i++) {
 			overrideFlags[i] = pCxbxVertexShader->VertexShaderInfo.vRegisterInDeclaration[i] ? 1.0f : 0.0f;
@@ -3582,7 +3581,7 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_SelectVertexShader)
 	if (pCxbxVertexShader)
 	{
 		pHostVertexDeclaration = pCxbxVertexShader->pHostVertexDeclaration;
-		pHostVertexShader = GetHostShader(pCxbxVertexShader);
+		pHostVertexShader = pCxbxVertexShader->HostVertexShader.get(g_pD3DDevice);
 		HostFVF = pCxbxVertexShader->HostFVF;
 
 		SetOverrideFlags(pCxbxVertexShader);
@@ -4177,36 +4176,6 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_SetShaderConstantMode)
     g_Xbox_VertexShaderConstantMode = Mode;
 }
 
-IDirect3DVertexShader9* GetHostShader(CxbxVertexShader *shader) {
-	auto pDeferredShader = &shader->HostVertexShader;
-
-	if (pDeferredShader->isReady)
-		return pDeferredShader->pHostVertexShader;
-
-	ID3DBlob* pCompiledShader = nullptr;
-	try {
-		EmuLog(LOG_LEVEL::FATAL, "Blocking for shader!");
-		pCompiledShader = pDeferredShader->pCompiledShader.get();
-		auto hRet = g_pD3DDevice->CreateVertexShader
-		(
-			(DWORD*)pCompiledShader->GetBufferPointer(),
-			&shader->HostVertexShader.pHostVertexShader
-		);
-
-		EmuLog(LOG_LEVEL::FATAL, "Created new vertex shader instance!");
-		//DEBUG_D3DRESULT(hRet, "g_pD3DDevice->CreateVertexShader");
-	}
-	catch (const std::exception & e) {
-		EmuLog(LOG_LEVEL::ERROR2, "Failed compiling shader: %s", e.what());
-	}
-
-	if (pCompiledShader) {
-		pCompiledShader->Release();
-	}
-
-	pDeferredShader->isReady = true;
-}
-
 ID3DBlob* AsyncCreateVertexShader(IntermediateVertexShader intermediateShader) {
 	ID3DBlob* pCompiledShader;
 
@@ -4302,7 +4271,7 @@ HRESULT WINAPI XTL::EMUPATCH(D3DDevice_CreateVertexShader)
 	g_pD3DDevice->SetVertexDeclaration(pCxbxVertexShader->pHostVertexDeclaration);
 	DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetVertexDeclaration");
 
-	DeferredVertexShader hostShader = DeferredVertexShader();
+	DeferredVertexShader hostShader;
 	DWORD         XboxFunctionSize = 0;
 	DWORD        *pRecompiledFunction = nullptr;
 	if (SUCCEEDED(hRet) && pFunction)
@@ -4316,11 +4285,11 @@ HRESULT WINAPI XTL::EMUPATCH(D3DDevice_CreateVertexShader)
 			&XboxFunctionSize,
 			&intermediateShader);
 
-		auto type = EmuGetShaderInfo(&intermediateShader);
+		auto shaderType = EmuGetShaderInfo(&intermediateShader);
 		
-		if (type == ShaderType::Compilable) {
+		if (shaderType == ShaderType::Compilable) {
 			EmuLog(LOG_LEVEL::FATAL, "Kicking off vertex shader creation for shader %llu size %d", hash, XboxFunctionSize);
-			hostShader.pCompiledShader = std::async(AsyncCreateVertexShader, intermediateShader);
+			hostShader = DeferredVertexShader(std::async(std::launch::deferred, AsyncCreateVertexShader, intermediateShader));
 		}
 	}
 
@@ -6828,7 +6797,7 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_SetVertexShader)
 		{
 			SetOverrideFlags(pCxbxVertexShader);
 
-			hRet = g_pD3DDevice->SetVertexShader(GetHostShader(pCxbxVertexShader));
+			hRet = g_pD3DDevice->SetVertexShader(pCxbxVertexShader->HostVertexShader.get(g_pD3DDevice));
 			DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetVertexShader(VshHandleIsVertexShader)");
 		}
 
@@ -8072,8 +8041,8 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_DeleteVertexShader)
 			DEBUG_D3DRESULT(hRet, "g_pD3DDevice->DeleteVertexShader(pHostVertexDeclaration)");
 		}
 
-		if (GetHostShader(pCxbxVertexShader)) {
-			HRESULT hRet = GetHostShader(pCxbxVertexShader)->Release();
+		if (pCxbxVertexShader->HostVertexShader.get(g_pD3DDevice)) {
+			HRESULT hRet = pCxbxVertexShader->HostVertexShader.get(g_pD3DDevice)->Release();
 			EmuLog(LOG_LEVEL::FATAL, "Blocking for shader!");
 			DEBUG_D3DRESULT(hRet, "g_pD3DDevice->DeleteVertexShader(pHostVertexShader)");
 		}

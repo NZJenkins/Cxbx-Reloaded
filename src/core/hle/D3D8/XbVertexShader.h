@@ -76,12 +76,21 @@ typedef struct _CxbxVertexShaderInfo
 }
 CxbxVertexShaderInfo;
 
-// TODO move D3D9 specific struct
-struct DeferredVertexShader {
+// TODO put this somewhere else?
+class DeferredVertexShader {
+public:
+	// Create a vertex shader with deferred creation
+	DeferredVertexShader(std::future<ID3DBlob*>);
+	// Create an empty vertex shader
+	DeferredVertexShader();
+
+	IDirect3DVertexShader* get(IDirect3DDevice*);
+
+private:
 	bool isReady = false;
 	IDirect3DVertexShader* pHostVertexShader = nullptr;
 	//uint64_t xboxShaderId = 0;
-	std::future<ID3DBlob*> pCompiledShader;
+	std::future<ID3DBlob*> compileResult;
 };
 
 typedef struct _CxbxVertexShader
