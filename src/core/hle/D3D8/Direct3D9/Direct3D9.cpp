@@ -549,7 +549,7 @@ const char *CxbxGetErrorDescription(HRESULT hResult)
 
 // TODO move to shader file. Needs to be called whenever a shader or declaration is set
 void SetOverrideFlags(CxbxVertexShader* pCxbxVertexShader) {
-	EmuLog(LOG_LEVEL::FATAL, "Blocking for shader!");
+	//EmuLog(LOG_LEVEL::FATAL, "Blocking for shader!");
 	if (pCxbxVertexShader != nullptr && pCxbxVertexShader->HostVertexShader.get(g_pD3DDevice) != nullptr) {
 		float overrideFlags[16];
 		for (int i = 0; i < 16; i++) {
@@ -4289,7 +4289,7 @@ HRESULT WINAPI XTL::EMUPATCH(D3DDevice_CreateVertexShader)
 		
 		if (shaderType == ShaderType::Compilable) {
 			EmuLog(LOG_LEVEL::FATAL, "Kicking off vertex shader creation for shader %llu size %d", hash, XboxFunctionSize);
-			hostShader = DeferredVertexShader(std::async(std::launch::deferred, AsyncCreateVertexShader, intermediateShader));
+			hostShader = DeferredVertexShader(std::async(std::launch::async, AsyncCreateVertexShader, intermediateShader));
 		}
 	}
 
@@ -8043,7 +8043,7 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_DeleteVertexShader)
 
 		if (pCxbxVertexShader->HostVertexShader.get(g_pD3DDevice)) {
 			HRESULT hRet = pCxbxVertexShader->HostVertexShader.get(g_pD3DDevice)->Release();
-			EmuLog(LOG_LEVEL::FATAL, "Blocking for shader!");
+			//EmuLog(LOG_LEVEL::FATAL, "Blocking for shader!");
 			DEBUG_D3DRESULT(hRet, "g_pD3DDevice->DeleteVertexShader(pHostVertexShader)");
 		}
 
