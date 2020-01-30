@@ -4,9 +4,11 @@
 
 #include "Logging.h"
 #include "util/hasher.h"
+#include "core/kernel/support/Emu.h"
 
 ID3DBlob* AsyncCreateVertexShader(IntermediateVertexShader intermediateShader, ShaderKey key) {
 	ID3DBlob* pCompiledShader;
+	SetThreadAffinityMask(GetCurrentThread(), g_CPUOthers);
 
 	auto hRet = EmuCompileShader(
 		&intermediateShader,
