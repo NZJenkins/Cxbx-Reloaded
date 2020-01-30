@@ -62,7 +62,7 @@ namespace xboxkrnl
 #include "core\kernel\common\strings.hpp" // For uem_str
 #include "common\input\SdlJoystick.h"
 #include "common/util/strConverter.hpp" // for utf8_to_utf16
-#include "VertexShader.h"
+#include "VertexShaderSource.h"
 
 #include <assert.h>
 #include <process.h>
@@ -547,18 +547,6 @@ const char *CxbxGetErrorDescription(HRESULT hResult)
 	return nullptr;
 }
 
-// TODO move to shader file. Needs to be called whenever a shader or declaration is set
-void SetOverrideFlags(CxbxVertexShader* pCxbxVertexShader) {
-	//EmuLog(LOG_LEVEL::FATAL, "Blocking for shader!");
-	if (pCxbxVertexShader != nullptr && pCxbxVertexShader->HostVertexShader.get(g_pD3DDevice) != nullptr) {
-		float overrideFlags[16];
-		for (int i = 0; i < 16; i++) {
-			overrideFlags[i] = pCxbxVertexShader->VertexShaderInfo.vRegisterInDeclaration[i] ? 1.0f : 0.0f;
-		}
-		g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_CONSTREG_VERTEXDATA4F_FLAG_BASE, overrideFlags, 4);
-	}
-}
-
 const char *D3DErrorString(HRESULT hResult)
 {
 	static char buffer[1024];
@@ -859,8 +847,19 @@ typedef struct {
 typedef std::unordered_map<resource_key_t, resource_info_t, resource_key_hash> resource_cache_t;
 resource_cache_t g_Cxbx_Cached_Direct3DResources;
 resource_cache_t g_Cxbx_Cached_PaletizedTextures;
+VertexShaderSource g_VertexShaderSource = VertexShaderSource();
 
-std::unordered_map<uint64_t, ID3DBlob*> g_Cxbx_Cached_VertexShaders = {};
+// TODO move to shader file. Needs to be called whenever a shader or declaration is set
+void SetOverrideFlags(CxbxVertexShader* pCxbxVertexShader) {
+	//EmuLog(LOG_LEVEL::FATAL, "Blocking for shader!");
+	if (pCxbxVertexShader != nullptr && g_VertexShaderSource.GetShader(pCxbxVertexShader->VertexShaderKey) != nullptr) {
+		float overrideFlags[16];
+		for (int i = 0; i < 16; i++) {
+			overrideFlags[i] = pCxbxVertexShader->VertexShaderInfo.vRegisterInDeclaration[i] ? 1.0f : 0.0f;
+		}
+		g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_CONSTREG_VERTEXDATA4F_FLAG_BASE, overrideFlags, 4);
+	}
+}
 
 bool IsResourceAPixelContainer(XTL::DWORD XboxResource_Common)
 {
@@ -2568,6 +2567,9 @@ static DWORD WINAPI EmuCreateDeviceProxy(LPVOID)
                 // begin scene
                 hRet = g_pD3DDevice->BeginScene();
 				DEBUG_D3DRESULT(hRet, "g_pD3DDevice->BeginScene(2nd)");
+
+				// Set up cache
+				g_VertexShaderSource.ResetD3DDevice(g_pD3DDevice);
             }
 
             // signal completion
@@ -3581,7 +3583,7 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_SelectVertexShader)
 	if (pCxbxVertexShader)
 	{
 		pHostVertexDeclaration = pCxbxVertexShader->pHostVertexDeclaration;
-		pHostVertexShader = pCxbxVertexShader->HostVertexShader.get(g_pD3DDevice);
+		pHostVertexShader = g_VertexShaderSource.GetShader(pCxbxVertexShader->VertexShaderKey);
 		HostFVF = pCxbxVertexShader->HostFVF;
 
 		SetOverrideFlags(pCxbxVertexShader);
@@ -4176,19 +4178,6 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_SetShaderConstantMode)
     g_Xbox_VertexShaderConstantMode = Mode;
 }
 
-ID3DBlob* AsyncCreateVertexShader(IntermediateVertexShader intermediateShader) {
-	ID3DBlob* pCompiledShader;
-
-	auto hRet = EmuCompileShader(
-		&intermediateShader,
-		&pCompiledShader
-	);
-
-	EmuLog(LOG_LEVEL::FATAL, "Finished compiling shader");
-
-	return pCompiledShader;
-}
-
 // ******************************************************************
 // * patch: D3DDevice_CreateVertexShader
 // ******************************************************************
@@ -4271,26 +4260,11 @@ HRESULT WINAPI XTL::EMUPATCH(D3DDevice_CreateVertexShader)
 	g_pD3DDevice->SetVertexDeclaration(pCxbxVertexShader->pHostVertexDeclaration);
 	DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetVertexDeclaration");
 
-	DeferredVertexShader hostShader;
+	uint64_t      vertexShaderKey = 0;
 	DWORD         XboxFunctionSize = 0;
-	DWORD        *pRecompiledFunction = nullptr;
 	if (SUCCEEDED(hRet) && pFunction)
 	{
-		auto intermediateShader = IntermediateVertexShader();
-		auto hash = ComputeHash((void*)pFunction, XboxFunctionSize);
-
-		// TODO cache lookup lookup
-
-		EmuParseVshFunction((DWORD*)pFunction,
-			&XboxFunctionSize,
-			&intermediateShader);
-
-		auto shaderType = EmuGetShaderInfo(&intermediateShader);
-		
-		if (shaderType == ShaderType::Compilable) {
-			EmuLog(LOG_LEVEL::FATAL, "Kicking off vertex shader creation for shader %llu size %d", hash, XboxFunctionSize);
-			hostShader = DeferredVertexShader(std::async(std::launch::async, AsyncCreateVertexShader, intermediateShader));
-		}
+		vertexShaderKey = g_VertexShaderSource.CreateShader(pFunction, &XboxFunctionSize);
 	}
 
 	pCxbxVertexShader->pXboxDeclarationCopy = (DWORD*)malloc(XboxDeclarationCount * sizeof(DWORD));
@@ -4300,7 +4274,7 @@ HRESULT WINAPI XTL::EMUPATCH(D3DDevice_CreateVertexShader)
 	pCxbxVertexShader->XboxVertexShaderType = X_VST_NORMAL; // TODO : This can vary
 	pCxbxVertexShader->XboxNrAddressSlots = (XboxFunctionSize - sizeof(X_VSH_SHADER_HEADER)) / X_VSH_INSTRUCTION_SIZE_BYTES;
 	pCxbxVertexShader->HostFVF = 0;
-	pCxbxVertexShader->HostVertexShader = std::move(hostShader);
+	pCxbxVertexShader->VertexShaderKey = vertexShaderKey;
 	pCxbxVertexShader->XboxDeclarationCount = XboxDeclarationCount;
 	// Save the status, to remove things later
 	// pCxbxVertexShader->XboxStatus = hRet; // Not even used by VshHandleIsValidShader()
@@ -6797,7 +6771,8 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_SetVertexShader)
 		{
 			SetOverrideFlags(pCxbxVertexShader);
 
-			hRet = g_pD3DDevice->SetVertexShader(pCxbxVertexShader->HostVertexShader.get(g_pD3DDevice));
+			auto pHostShader = g_VertexShaderSource.GetShader(pCxbxVertexShader->VertexShaderKey);
+			hRet = g_pD3DDevice->SetVertexShader(pHostShader);
 			DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetVertexShader(VshHandleIsVertexShader)");
 		}
 
@@ -8041,11 +8016,8 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_DeleteVertexShader)
 			DEBUG_D3DRESULT(hRet, "g_pD3DDevice->DeleteVertexShader(pHostVertexDeclaration)");
 		}
 
-		if (pCxbxVertexShader->HostVertexShader.get(g_pD3DDevice)) {
-			HRESULT hRet = pCxbxVertexShader->HostVertexShader.get(g_pD3DDevice)->Release();
-			//EmuLog(LOG_LEVEL::FATAL, "Blocking for shader!");
-			DEBUG_D3DRESULT(hRet, "g_pD3DDevice->DeleteVertexShader(pHostVertexShader)");
-		}
+		// Release the host vertex shader
+		g_VertexShaderSource.ReleaseShader(pCxbxVertexShader->VertexShaderKey);
 
 		if (pCxbxVertexShader->pXboxDeclarationCopy)
 		{

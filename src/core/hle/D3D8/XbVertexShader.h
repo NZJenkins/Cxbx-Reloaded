@@ -76,22 +76,6 @@ typedef struct _CxbxVertexShaderInfo
 }
 CxbxVertexShaderInfo;
 
-// TODO put this somewhere else?
-class DeferredVertexShader {
-public:
-	// Create a vertex shader with deferred creation
-	DeferredVertexShader(std::future<ID3DBlob*>);
-	// Create an empty vertex shader
-	DeferredVertexShader();
-
-	IDirect3DVertexShader* get(IDirect3DDevice*);
-
-private:
-	bool isReady = false;
-	IDirect3DVertexShader* pHostVertexShader = nullptr;
-	//uint64_t xboxShaderId = 0;
-	std::future<ID3DBlob*> compileResult;
-};
 
 typedef struct _CxbxVertexShader
 {
@@ -107,7 +91,7 @@ typedef struct _CxbxVertexShader
 
 	// The resulting host variables
 	DWORD HostFVF; // Flexible Vertex Format (used when there's no host vertex shader)
-	DeferredVertexShader HostVertexShader; // if nullptr, use SetFVF(HostFVF);
+	uint64_t VertexShaderKey; // if nullptr, use SetFVF(HostFVF);
 	IDirect3DVertexDeclaration* pHostVertexDeclaration;
 
 	// Needed for dynamic stream patching
