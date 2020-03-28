@@ -986,8 +986,23 @@ IDirect3DResource *GetHostResource(XTL::X_D3DResource *pXboxResource, DWORD D3DU
 	return it->second.pHostResource;
 }
 
+extern NV2ADevice* g_NV2A;
+
+std::array<std::array<float, 4>, 192> g_vshConstants = { 0 };
+
+void SetVertexShaderConstant(int index, const float* value) {
+	g_vshConstants[index][0] = value[0];
+	g_vshConstants[index][1] = value[1];
+	g_vshConstants[index][2] = value[2];
+	g_vshConstants[index][3] = value[3];
+}
+
+bool isFixedFunctionMode = false;
+
 void SetFixedFunctionShader() {
 	LOG_INIT
+
+	isFixedFunctionMode = true;
 
 	static IDirect3DVertexShader9* fvfShader = nullptr;
 
@@ -1012,6 +1027,7 @@ void SetCxbxVertexShader(CxbxVertexShader* pCxbxVertexShader) {
 	LOG_INIT
 
 	HRESULT hRet;
+	isFixedFunctionMode = false;
 
 	// Get vertex shader if we have a key
 	auto pHostShader = pCxbxVertexShader->VertexShaderKey
@@ -4061,6 +4077,9 @@ void UpdateViewPortOffsetAndScaleConstants()
     float vOffset[4], vScale[4];
     GetViewPortOffsetAndScale(vOffset, vScale);
 
+	// FIXME
+	//CopyVertexConstantToNv2a(CXBX_D3DVS_VIEWPORT_SCALE_MIRROR, vScale);
+	//CopyVertexConstantToNv2a(CXBX_D3DVS_VIEWPORT_OFFSET_MIRROR, vOffset);
 	g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_VIEWPORT_SCALE_MIRROR, vScale, 1);
     g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_VIEWPORT_OFFSET_MIRROR, vOffset, 1);
 
@@ -4069,8 +4088,10 @@ void UpdateViewPortOffsetAndScaleConstants()
 	// We only do this if X_D3DSCM_NORESERVEDCONSTANTS is not set, since enabling this flag frees up these registers for shader used
 	if (g_Xbox_VertexShaderConstantMode != X_D3DSCM_NORESERVEDCONSTANTS)
 	{
-		g_pD3DDevice->SetVertexShaderConstantF(X_D3DSCM_RESERVED_CONSTANT_SCALE + X_D3DSCM_CORRECTION, vScale, 1);
-		g_pD3DDevice->SetVertexShaderConstantF(X_D3DSCM_RESERVED_CONSTANT_OFFSET + X_D3DSCM_CORRECTION, vOffset, 1);
+		// g_pD3DDevice->SetVertexShaderConstantF(X_D3DSCM_RESERVED_CONSTANT_SCALE + X_D3DSCM_CORRECTION, vScale, 1);
+		// g_pD3DDevice->SetVertexShaderConstantF(X_D3DSCM_RESERVED_CONSTANT_OFFSET + X_D3DSCM_CORRECTION, vOffset, 1);
+		SetVertexShaderConstant(X_D3DSCM_RESERVED_CONSTANT_SCALE + X_D3DSCM_CORRECTION, vScale);
+		SetVertexShaderConstant(X_D3DSCM_RESERVED_CONSTANT_OFFSET + X_D3DSCM_CORRECTION, vOffset);
 	}
 }
 
@@ -4374,11 +4395,14 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_SetVertexShaderConstant)
 	if (Register < 0) LOG_TEST_CASE("Register < 0");
 	if (Register + ConstantCount > X_D3DVS_CONSTREG_COUNT) LOG_TEST_CASE("Register + ConstantCount > X_D3DVS_CONSTREG_COUNT");
     HRESULT hRet;
-	hRet = g_pD3DDevice->SetVertexShaderConstantF(
-		Register,
-		(float*)pConstantData,
-		ConstantCount
-	);
+	//hRet = g_pD3DDevice->SetVertexShaderConstantF(
+	//	Register,
+	//	(float*)pConstantData,
+	//	ConstantCount
+	//);
+	for (int i = 0; i < ConstantCount; i++) {
+		SetVertexShaderConstant(Register + i, (float*)pConstantData + i * 4);
+	}
 	DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetVertexShaderConstant");
 
     if(FAILED(hRet))
@@ -4655,7 +4679,6 @@ extern uint32_t HLE_read_NV2A_pgraph_register(const int reg); // Declared in Pus
 extern void HLE_write_NV2A_vertex_attribute_slot(unsigned slot, uint32_t parameter); // Declared in PushBuffer.cpp
 extern uint32_t HLE_read_NV2A_vertex_attribute_slot(unsigned VertexSlot); // Declared in PushBuffer.cpp
 
-extern NV2ADevice* g_NV2A;
 
 // ******************************************************************
 // * patch: D3DDevice_SetVertexData4f_16
@@ -7147,19 +7170,22 @@ void CxbxUpdateNativeD3DResources()
 
     EmuUpdateActiveTextureStages();
 
-	// Some titles set Vertex Shader constants directly via pushbuffers rather than through D3D
-	// We handle that case by updating any constants that have the dirty flag set on the nv2a.
-	auto nv2a = g_NV2A->GetDeviceState();
-	for(int i = 0; i < X_D3DVS_CONSTREG_COUNT; i++) {
-        // Skip vOffset and vScale constants, we don't want our values to be overwritten by accident
-        if (i == X_D3DSCM_RESERVED_CONSTANT_OFFSET_CORRECTED || i == X_D3DSCM_RESERVED_CONSTANT_SCALE_CORRECTED) {
-            continue;
-        }
+	if (!isFixedFunctionMode) {
+		// Some titles set Vertex Shader constants directly via pushbuffers rather than through D3D
+		// We handle that case by updating any constants that have the dirty flag set on the nv2a.
+		auto nv2a = g_NV2A->GetDeviceState();
+		for (int i = 0; i < X_D3DVS_CONSTREG_COUNT; i++) {
+			// Skip vOffset and vScale constants, we don't want our values to be overwritten by accident
+			if (i == X_D3DSCM_RESERVED_CONSTANT_OFFSET_CORRECTED || i == X_D3DSCM_RESERVED_CONSTANT_SCALE_CORRECTED) {
+				continue;
+			}
 
-		if (nv2a->pgraph.vsh_constants_dirty[i]) {
-			g_pD3DDevice->SetVertexShaderConstantF(i, (float*)&nv2a->pgraph.vsh_constants[i][0], 1);
-			nv2a->pgraph.vsh_constants_dirty[i] = false;
+			if (nv2a->pgraph.vsh_constants_dirty[i]) {
+				SetVertexShaderConstant(i, (float*)&nv2a->pgraph.vsh_constants[i][0]);
+				nv2a->pgraph.vsh_constants_dirty[i] = false;
+			}
 		}
+		g_pD3DDevice->SetVertexShaderConstantF(0, (float*)&g_vshConstants, X_D3DVS_CONSTREG_COUNT);
 	}
 
     // NOTE: Order is important here
