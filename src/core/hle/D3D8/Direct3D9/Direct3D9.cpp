@@ -70,6 +70,7 @@ namespace xboxkrnl
 #include "common\input\SdlJoystick.h"
 #include "common/util/strConverter.hpp" // for utf8_to_utf16
 #include "VertexShaderSource.h"
+#include "RenderStateBlock.cpp"
 
 #include <assert.h>
 #include <process.h>
@@ -857,6 +858,7 @@ typedef std::unordered_map<resource_key_t, resource_info_t, resource_key_hash> r
 resource_cache_t g_Cxbx_Cached_Direct3DResources;
 resource_cache_t g_Cxbx_Cached_PaletizedTextures;
 VertexShaderSource g_VertexShaderSource = VertexShaderSource();
+RenderStateBlock g_renderStateBlock = {};
 
 bool IsResourceAPixelContainer(XTL::DWORD XboxResource_Common)
 {
@@ -984,6 +986,18 @@ IDirect3DResource *GetHostResource(XTL::X_D3DResource *pXboxResource, DWORD D3DU
 	return it->second.pHostResource;
 }
 
+void SetFixedFunctionShader() {
+	static IDirect3DVertexShader9* fvfShader = nullptr;
+
+	if (!fvfShader) {
+		DWORD* blobby = nullptr;
+		EmuCompileXboxFvf((char**)&blobby);
+		g_pD3DDevice->CreateVertexShader(blobby, &fvfShader);
+	}
+
+	g_pD3DDevice->SetVertexShader(fvfShader);
+}
+
 void SetCxbxVertexShader(CxbxVertexShader* pCxbxVertexShader) {
 
 	LOG_INIT
@@ -1003,6 +1017,7 @@ void SetCxbxVertexShader(CxbxVertexShader* pCxbxVertexShader) {
 	if (pCxbxVertexShader->HostFVF)
 	{
 		// Set the FVF
+		CxbxKrnlCleanup("oh shit");
 		hRet = g_pD3DDevice->SetFVF(pCxbxVertexShader->HostFVF);
 		DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetFVF");
 	}
@@ -3626,6 +3641,7 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_SelectVertexShader)
 		// Set the FVF
 		hRet = g_pD3DDevice->SetFVF(HostFVF);
 		DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetFVF(D3DFVF_XYZ | D3DFVF_TEX0)");
+		SetFixedFunctionShader();
 	}
     else if(Address < 136)
     {
@@ -6515,6 +6531,8 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_SetTransform)
     }
     */
 
+	((D3DMATRIX*)&g_renderStateBlock.Transforms)[State] = *pMatrix;
+
     State = EmuXB2PC_D3DTS(State);
 
     HRESULT hRet = g_pD3DDevice->SetTransform(State, pMatrix);
@@ -6736,6 +6754,7 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_SetVertexShader)
 		DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetVertexShader");
 		hRet = g_pD3DDevice->SetFVF(Handle);
 		DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetFVF");
+		SetFixedFunctionShader();
 	}
 
 	UpdateViewPortOffsetAndScaleConstants();
@@ -7118,6 +7137,11 @@ void CxbxUpdateNativeD3DResources()
 	PrunePaletizedTexturesCache(); // TODO : Could we move this to Swap instead?
 
     EmuUpdateActiveTextureStages();
+
+	g_pD3DDevice->SetVertexShaderConstantF(
+		CXBX_D3DVS_FIXEDFUNCSTATE,
+		(float*)&g_renderStateBlock,
+		sizeof(RenderStateBlock) / (4 * sizeof(float)));
 
 	// Some titles set Vertex Shader constants directly via pushbuffers rather than through D3D
 	// We handle that case by updating any constants that have the dirty flag set on the nv2a.
