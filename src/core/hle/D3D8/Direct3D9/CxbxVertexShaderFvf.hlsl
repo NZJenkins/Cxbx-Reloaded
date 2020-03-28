@@ -155,7 +155,7 @@ VS_OUTPUT main(const VS_INPUT xIn)
     xOut.oPos = mul(cameraPos, state.Transforms.Projection);
 
     // Vertex lighting
-    if (true)
+    if (false)
     {
         float3 worldNormal = normalize(mul(xIn.normal.xyz, (float3x3) state.Transforms.World));
         // output.wNorm = worldNormal;
