@@ -4,6 +4,8 @@
 #include "core\kernel\init\CxbxKrnl.h"
 #include "core\kernel\support\Emu.h"
 
+#include <fstream>
+#include <iostream>
 #include <sstream>
 
 extern const char* g_vs_model = vs_model_3_0;
@@ -220,44 +222,24 @@ extern ShaderType EmuGetShaderInfo(IntermediateVertexShader* pIntermediateShader
 	return ShaderType::Compilable;
 }
 
-// recompile xbox vertex shader function
-extern HRESULT EmuCompileShader
-(
-	IntermediateVertexShader* pIntermediateShader,
-	ID3DBlob** ppHostShader
-)
-{
+HRESULT CompileHlsl(const std::string& hlsl, ID3DBlob** ppHostShader) {
+	// Level 0 for fastest runtime compilation
+	// TODO Can we recompile an optimized shader in the background?
+	UINT flags1 = D3DCOMPILE_OPTIMIZATION_LEVEL0;
+
 	// TODO include header in vertex shader
 	//XTL::X_VSH_SHADER_HEADER* pXboxVertexShaderHeader = (XTL::X_VSH_SHADER_HEADER*)pXboxFunction;
 	ID3DBlob* pErrors = nullptr;
 	HRESULT             hRet = 0;
 
-	// Include HLSL header and footer as raw strings :
-	static std::string hlsl_template[2] = {
-		#include "core\hle\D3D8\Direct3D9\CxbxVertexShaderTemplate.hlsl"
-	};
-
-	auto hlsl_stream = std::stringstream();
-	hlsl_stream << hlsl_template[0]; // Start with the HLSL template header
-	assert(pIntermediateShader->Instructions.size() > 0);
-	BuildShader(pIntermediateShader, hlsl_stream);
-
-	hlsl_stream << hlsl_template[1]; // Finish with the HLSL template footer
-	std::string hlsl_str = hlsl_stream.str();
-
-	EmuLog(LOG_LEVEL::DEBUG, "--- HLSL conversion ---");
-	EmuLog(LOG_LEVEL::DEBUG, DebugPrependLineNumbers(hlsl_str).c_str());
-	EmuLog(LOG_LEVEL::DEBUG, "-----------------------");
-
 
 	UINT flags1 = D3DCOMPILE_OPTIMIZATION_LEVEL3 | D3DCOMPILE_AVOID_FLOW_CONTROL;
-
 	hRet = D3DCompile(
-		hlsl_str.c_str(),
-		hlsl_str.length(),
+		hlsl.c_str(),
+		hlsl.length(),
 		nullptr, // pSourceName
 		nullptr, // pDefines
-		nullptr, // pInclude // TODO precompile x_* HLSL functions?
+		D3D_COMPILE_STANDARD_FILE_INCLUDE, // pInclude // TODO precompile x_* HLSL functions?
 		"main", // shader entry poiint
 		g_vs_model, // shader profile
 		flags1, // flags1
@@ -270,11 +252,11 @@ extern HRESULT EmuCompileShader
 		// Test Case: Spy vs Spy
 		flags1 |= D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY;
 		hRet = D3DCompile(
-			hlsl_str.c_str(),
-			hlsl_str.length(),
+			hlsl.c_str(),
+			hlsl.length(),
 			nullptr, // pSourceName
 			nullptr, // pDefines
-			nullptr, // pInclude // TODO precompile x_* HLSL functions?
+			D3D_COMPILE_STANDARD_FILE_INCLUDE, // pInclude // TODO precompile x_* HLSL functions?
 			"main", // shader entry poiint
 			g_vs_model, // shader profile
 			flags1, // flags1
@@ -317,3 +299,50 @@ extern HRESULT EmuCompileShader
 
 	return hRet;
 }
+
+// recompile xbox vertex shader function
+extern HRESULT EmuCompileShader
+(
+	IntermediateVertexShader* pIntermediateShader,
+	ID3DBlob** ppHostShader
+)
+{
+	// Include HLSL header and footer as raw strings :
+	static std::string hlsl_template[2] = {
+		#include "core\hle\D3D8\Direct3D9\CxbxVertexShaderTemplate.hlsl"
+	};
+
+	auto hlsl_stream = std::stringstream();
+	hlsl_stream << hlsl_template[0]; // Start with the HLSL template header
+	assert(pIntermediateShader->Instructions.size() > 0);
+	BuildShader(pIntermediateShader, hlsl_stream);
+
+	hlsl_stream << hlsl_template[1]; // Finish with the HLSL template footer
+	std::string hlsl_str = hlsl_stream.str();
+
+	EmuLog(LOG_LEVEL::DEBUG, "--- HLSL conversion ---");
+	EmuLog(LOG_LEVEL::DEBUG, DebugPrependLineNumbers(hlsl_str).c_str());
+	EmuLog(LOG_LEVEL::DEBUG, "-----------------------");
+
+	return CompileHlsl(hlsl_str, ppHostShader);
+}
+
+static std::vector<char> fvfShaderBuffer;
+static ID3DBlob* pFvfHostShader = nullptr;
+
+extern HRESULT EmuCompileXboxFvf(char** shaderData)
+{
+	if (!pFvfHostShader) {
+		// std::ifstream shaderStream(R"(C:\Users\Anthony\Desktop\_\dev\Cxbx-Reloaded\build\x86-Release\bin\Release\CxbxVertexShaderFvf.cso)", std::ios::in | std::ios::binary);
+		auto pathy = std::filesystem::current_path();
+		std::ifstream shaderStream("../../../x86-Release/bin/Release/CxbxVertexShaderFvf.cso", std::ios::in | std::ios::binary);
+		fvfShaderBuffer = std::vector<char>(std::istreambuf_iterator<char>(shaderStream), std::istreambuf_iterator<char>());
+		// CompileHlsl(buffer.str(), &pFvfHostShader);
+	}
+
+	*shaderData = fvfShaderBuffer.data();
+	//*ppHostShader = pFvfHostShader;
+	return 0;
+}
+
+
