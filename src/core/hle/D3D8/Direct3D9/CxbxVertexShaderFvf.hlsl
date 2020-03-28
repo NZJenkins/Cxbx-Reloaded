@@ -95,13 +95,13 @@ ColorsOutput DoDirectionalLight(Light l, float3 worldNormal)
 
     // Intensity from N . L
     float NdotL = dot(worldNormal, -normalize(l.Direction));
-    float lightDiffuse = abs(NdotL * l.Diffuse);
+    float lightDiffuse = abs(NdotL * l.Diffuse.rgb);
 
     // Apply light contribution to front or back face
     // as the case may be
-    if (NdotL > 0)
+    if (NdotL >= 0)
         o.Diffuse += lightDiffuse;
-    else if (NdotL < 0)
+    else
         o.BackDiffuse = lightDiffuse;
 
     // TODO specular
@@ -230,21 +230,16 @@ VS_OUTPUT
     xOut.oPos = mul(cameraPos, state.Transforms.Projection);
 
     // Vertex lighting
+    ColorsOutput lighting;
     if (state.Modes.Lighting)
     {
         float3 worldNormal = normalize(world.Normal);
-        // output.wNorm = worldNormal;
-        ColorsOutput cOut = CalcLighting(worldNormal, worldPos.xyz, cameraPos.xyz);
-        xOut.oD0 = cOut.Diffuse;
-        xOut.oD1 = cOut.Specular;
-        // TODO backface calcs
-        xOut.oB0 = cOut.BackDiffuse;
-        xOut.oB1 = cOut.BackSpecular;
+        lighting = CalcLighting(worldNormal, worldPos.xyz, cameraPos.xyz);
     }
     else
     {
-        xOut.oD0 = xOut.oB0 = float4(1, 1, 1, 1);
-        xOut.oD1 = xOut.oB1 = float4(0, 0, 0, 0);
+        lighting.Diffuse = lighting.BackDiffuse = float4(1, 1, 1, 1);
+        lighting.Specular = lighting.BackSpecular = float4(0, 0, 0, 1);
     }
     // TODO fog and fog state
 	xOut.oFog = 0;
@@ -253,10 +248,11 @@ VS_OUTPUT
     // TODO point stuff
 	xOut.oPts = 0;
 
-    xOut.oD0 = saturate(xOut.oD0);
-    xOut.oD1 = saturate(xOut.oD1);
-    xOut.oB0 = saturate(xOut.oB0);
-    xOut.oB1 = saturate(xOut.oB1);
+    xOut.oD0 = saturate(float4(xIn.color[0], 1) * lighting.Diffuse);
+    xOut.oD1 = saturate(float4(xIn.color[1], 1) * lighting.Specular);
+    // TODO backface colours
+    xOut.oB0 = saturate(lighting.BackDiffuse);
+    xOut.oB1 = saturate(lighting.BackSpecular);
 
 	// TODO reverse scaling for linear textures
 	xOut.oT0 = xIn.texcoord[0];
