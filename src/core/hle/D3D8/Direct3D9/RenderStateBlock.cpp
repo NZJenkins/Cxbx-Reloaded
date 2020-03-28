@@ -30,14 +30,8 @@
 struct Transforms {
     float4x4 View; // 0
     float4x4 Projection; // 1
-    float4x4 Texture0; // 2
-    float4x4 Texture1; // 3
-    float4x4 Texture2; // 4
-    float4x4 Texture3; // 5
-    float4x4 World; // 6
-    float4x4 World1; // 7
-    float4x4 World2; // 8
-    float4x4 World3; // 9
+    arr(Texture, float4x4, 4); // 2, 3, 4, 5
+    arr(World, float4x4, 4); // 6, 7, 8, 9
 };
 
 #pragma pack 4
@@ -64,8 +58,8 @@ struct Light {
 
 #pragma pack 4
 struct Modes {
-    int Lighting;
-    int VertexBlend;
+    uint Lighting;
+    uint VertexBlend;
 };
 
 #pragma pack 16
