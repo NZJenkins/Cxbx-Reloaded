@@ -146,38 +146,55 @@ ColorsOutput CalcLighting(float3 worldNormal, float3 worldPos, float3 cameraPos)
     return totalLightOutput;
 }
 
-float4 CalcWorldPos(VS_INPUT xIn)
+struct WorldTransformOutput
 {
-    // D3D
-    const uint _BLEND_OFF = 0;
-    const uint _1WEIGHT_2MAT = 1;
-    const uint _2WEIGHT_3MAT = 3;
-    const uint _3WEIGHT_4MAT = 5;
-    // Xbox
-    const uint _2WEIGHT_2MAT = 2;
-    const uint _3WEIGHT_3MAT = 4;
-    const uint _4WEIGHT_4MAT = 6;
+    float4 Position;
+    float3 Normal;
+};
 
-    if (state.Modes.VertexBlend == _BLEND_OFF)
-        return mul(xIn.pos, state.Transforms.World[0]);
+WorldTransformOutput DoWorldTransform(float4 position, float3 normal, float4 blendWeights)
+{
+    WorldTransformOutput output;
+
+    // D3D
+    const int _BLEND_OFF = 0;
+    const int _1WEIGHT_2MAT = 1;
+    const int _2WEIGHT_3MAT = 3;
+    const int _3WEIGHT_4MAT = 5;
+    // Xbox
+    const int _2WEIGHT_2MAT = 2;
+    const int _3WEIGHT_3MAT = 4;
+    const int _4WEIGHT_4MAT = 6;
+
+    if (state.Modes.VertexBlend == _BLEND_OFF) {
+        output.Position = mul(position, state.Transforms.World[0]);
+        output.Normal = mul(normal, (float3x3)state.Transforms.World[0]);
+        return output;
+    }
     
     // The number of matrices to blend
     int mats = floor((state.Modes.VertexBlend - 1) / 2 + 2);
     // If we have to calculate the last blend value
     bool calcLastBlend = fmod(state.Modes.VertexBlend, 2) == 1;
 
-    float4 output = float4(0, 0, 0, 0);
     float lastBlend = 1;
     for (int i = 0; i < mats - 1; i++)
     {
-        output += mul(xIn.pos, state.Transforms.World[i]) * xIn.bw[i];
-        lastBlend -= xIn.bw[i];
+        output.Position += mul(position, state.Transforms.World[i]) * blendWeights[i];
+        output.Normal += mul(normal, (float3x3) state.Transforms.World[i]) * blendWeights[i];
+        lastBlend -= blendWeights[i];
     }
 
     if (calcLastBlend)
-        output += mul(xIn.pos, state.Transforms.World[mats - 1]) * lastBlend;
+    {
+        output.Position += mul(position, state.Transforms.World[mats-1]) * lastBlend;
+        output.Normal += mul(normal, (float3x3) state.Transforms.World[mats-1]) * lastBlend;
+    }
     else
-        output += mul(xIn.pos, state.Transforms.World[mats-1]) * xIn.bw[mats-1];
+    {
+        output.Position += mul(position, state.Transforms.World[mats-1]) * blendWeights[mats-1];
+        output.Normal += mul(normal, (float3x3) state.Transforms.World[mats-1]) * blendWeights[mats-1];
+    }
 
     return output;
 }
@@ -188,14 +205,17 @@ VS_OUTPUT
 {
 	VS_OUTPUT xOut;
 
-    float4 worldPos = CalcWorldPos(xIn);
+    // World transform with vertex blending
+    WorldTransformOutput world = DoWorldTransform(xIn.pos, xIn.normal.xyz, xIn.bw);
+
+    float4 worldPos = world.Position;
     float4 cameraPos = mul(worldPos, state.Transforms.View);
     xOut.oPos = mul(cameraPos, state.Transforms.Projection);
 
     // Vertex lighting
     if (state.Modes.Lighting)
     {
-        float3 worldNormal = normalize(mul(xIn.normal.xyz, (float3x3) state.Transforms.World[0]));
+        float3 worldNormal = normalize(world.Normal);
         // output.wNorm = worldNormal;
         ColorsOutput cOut = CalcLighting(worldNormal, worldPos.xyz, cameraPos.xyz);
         xOut.oD0 = cOut.Diffuse;
