@@ -58,8 +58,8 @@ struct Light {
 
 #pragma pack 4
 struct Modes {
-    uint Lighting;
-    uint VertexBlend;
+    int Lighting;
+    int VertexBlend;
 };
 
 #pragma pack 16
