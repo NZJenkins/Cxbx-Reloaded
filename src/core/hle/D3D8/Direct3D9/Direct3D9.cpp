@@ -7705,13 +7705,109 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_DrawIndexedVerticesUP)
 	CxbxHandleXboxCallbacks();
 }
 
+class FakeD3DState {
 
-// Keep track of the last 8 lights set
-std::array<XTL::X_D3DLIGHT8, 4096> lightIndices = {};
-int lastLightIndex = -1;
+	D3DCOLORVALUE colorValue(float r, float g, float b, float a) {
+		auto value = D3DCOLORVALUE();
+		value.r = r;
+		value.g = g;
+		value.b = b;
+		value.a = a;
+		return value;
+	}
+
+	D3DVECTOR toVector(float x, float y, float z) {
+		auto value = D3DVECTOR();
+		value.x = x;
+		value.y = y;
+		value.z = z;
+		return value;
+	}
+
+public:
+	// Lighting
+	std::array<XTL::X_D3DLIGHT8, 4096> Lights;
+	// Keep track of the last 8 lights set
+	std::array<int, 8> EnabledLights;
+
+	FakeD3DState() {
+		// Define the default light
+		// When unset lights are enabled, they're set to the default light
+		auto defaultLight = XTL::X_D3DLIGHT8();
+		defaultLight.Type = D3DLIGHT_DIRECTIONAL;
+		defaultLight.Diffuse = colorValue(1, 1, 1, 0);
+		defaultLight.Specular = colorValue(0, 0, 0, 0);
+		defaultLight.Ambient = colorValue(0, 0, 0, 0);
+		defaultLight.Position = toVector(0, 0, 0);
+		defaultLight.Direction = toVector(0, 0, 1);
+		defaultLight.Range = 0;
+		defaultLight.Falloff = 0;
+		defaultLight.Attenuation0 = 0;
+		defaultLight.Attenuation1 = 0;
+		defaultLight.Attenuation2 = 0;
+		defaultLight.Theta = 0;
+		defaultLight.Phi = 0;
+
+		// We'll just preset every light to the default light
+		Lights.fill(defaultLight);
+		EnabledLights.fill(-1);
+	}
+
+	int EnableLight(int index, bool enable) {
+		// EnabledLights contains the index of the enabled light
+		// or -1 at the end representing free slots
+
+		// Check to see if the light is already enabled
+		// Disable it if so
+		for (int i = 0; i < EnabledLights.size(); i++) {
+			if (EnabledLights[i] == index) {
+				// If enabling do nothing
+				// if disabling, disable the light
+				if (!enable) {
+					// Disable this light and move to the end
+					EnabledLights[i] = -1;
+					std::rotate(std::begin(EnabledLights) + i, std::begin(EnabledLights) + i + 1, std::end(EnabledLights));
+				}
+				return -1;
+			}
+			// Enable light if a slot is free
+			if (enable && EnabledLights[i] == -1) {
+				EnabledLights[i] = index;
+				return i;
+			}
+		}
+
+		// Replace the oldest element and move to end
+		EnabledLights[0] = index;
+		std::rotate(std::begin(EnabledLights), std::begin(EnabledLights) + 1, std::end(EnabledLights));
+		return 0;
+	}
+};
 
 D3DXVECTOR4 toVector(D3DCOLORVALUE val) {
 	return D3DXVECTOR4(val.r, val.g, val.b, val.a);
+}
+
+FakeD3DState fakeD3DState = FakeD3DState();
+
+void UpdateLightState(int lightIndex, int enabledLightsIndex) {
+		auto d3dLight = &fakeD3DState.Lights[lightIndex];
+		auto light = &g_renderStateBlock.Lights[enabledLightsIndex];
+
+		// Map D3D light to state struct
+		light->Type = (int) d3dLight->Type;
+		light->Diffuse = toVector(d3dLight->Diffuse);
+		light->Specular = toVector(d3dLight->Specular);
+		light->Ambient = toVector(d3dLight->Ambient);
+		light->Position = d3dLight->Position;
+		light->Direction = d3dLight->Direction;
+		light->Range = d3dLight->Range;
+		light->Falloff = d3dLight->Falloff;
+		light->Attenuation0 = d3dLight->Attenuation0;
+		light->Attenuation1 = d3dLight->Attenuation1;
+		light->Attenuation2 = d3dLight->Attenuation2;
+		light->Theta = d3dLight->Theta;
+		light->Phi = d3dLight->Phi;
 }
 
 // ******************************************************************
@@ -7730,25 +7826,7 @@ HRESULT WINAPI XTL::EMUPATCH(D3DDevice_SetLight)
 
 	XB_TRMP(D3DDevice_SetLight)(Index, pLight);
 
-	// TODO keep track of the last 8 active lights?
-	if (Index >= 0 && Index < g_renderStateBlock.Lights.size()) {
-		auto light = &g_renderStateBlock.Lights[Index];
-
-		// Map D3D light to state struct
-		light->Type = pLight->Type;
-		light->Diffuse = toVector(pLight->Diffuse);
-		light->Specular = toVector(pLight->Specular);
-		light->Ambient = toVector(pLight->Ambient);
-		light->Position = pLight->Position;
-		light->Direction = pLight->Direction;
-		light->Range = pLight->Range;
-		light->Falloff = pLight->Falloff;
-		light->Attenuation0 = pLight->Attenuation0;
-		light->Attenuation1 = pLight->Attenuation1;
-		light->Attenuation2 = pLight->Attenuation2;
-		light->Theta = pLight->Theta;
-		light->Phi = pLight->Phi;
-	}
+	fakeD3DState.Lights[Index] = *pLight;
 
     HRESULT hRet = g_pD3DDevice->SetLight(Index, pLight);
 	DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetLight");
@@ -7786,8 +7864,8 @@ HRESULT WINAPI XTL::EMUPATCH(D3DDevice_LightEnable)
 
 	XB_TRMP(D3DDevice_LightEnable)(Index, bEnable);
 
-	if (Index >= 0 && Index < g_renderStateBlock.Lights.size())
-		g_renderStateBlock.Lights[Index].Enabled = bEnable;
+	auto enabledLightIndex = fakeD3DState.EnableLight(Index, bEnable);
+	UpdateLightState(Index, enabledLightIndex);
 
     HRESULT hRet = g_pD3DDevice->LightEnable(Index, bEnable);
 	DEBUG_D3DRESULT(hRet, "g_pD3DDevice->LightEnable");    

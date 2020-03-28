@@ -13,6 +13,7 @@
 #define float3 D3DVECTOR
 #define float2 D3DXVECTOR2
 #define arr(name, type, length) std::array<type, length> name
+#define uint UINT
 
 #else
 // HLSL
@@ -47,17 +48,16 @@ struct Light {
     float4 Ambient;
     // 16 bytes
     float3 Position;
-    float Enabled;
+    float Range;
     // 16 bytes
     float3 Direction;
-    float Type; // 1=Point, 2=Spot, 3=Directional
+    uint Type; // 1=Point, 2=Spot, 3=Directional
     //
-    float Range;
     float Falloff;
     float Attenuation0;
     float Attenuation1;
-    //
     float Attenuation2;
+    //
     float Theta;
     float Phi;
 };
