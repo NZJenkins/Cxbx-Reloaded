@@ -20,7 +20,7 @@ struct VS_INPUT
 	// TexCoord 0 - 3
     float4 pos : POSITION;
     float4 bw : BLENDWEIGHT;
-    float3 color[2] : COLOR;
+    float4 color[2] : COLOR;
     float4 normal : NORMAL;
     float4 texcoord[4] : TEXCOORD;
 	
@@ -102,7 +102,7 @@ ColorsOutput DoDirectionalLight(Light l, float3 worldNormal)
     if (NdotL >= 0)
         o.Diffuse += lightDiffuse;
     else
-        o.BackDiffuse = lightDiffuse;
+        o.BackDiffuse += lightDiffuse;
 
     // TODO specular
 
@@ -126,8 +126,8 @@ ColorsOutput CalcLighting(float3 worldNormal, float3 worldPos, float3 cameraPos)
     ColorsOutput totalLightOutput;
     totalLightOutput.Diffuse = float4(0, 0, 0, 1);
     totalLightOutput.BackDiffuse = float4(0, 0, 0, 1);
-    totalLightOutput.Specular = float4(0, 0, 0, 0);
-    totalLightOutput.BackSpecular = float4(0, 0, 0, 0);
+    totalLightOutput.Specular = float4(0, 0, 0, 1);
+    totalLightOutput.BackSpecular = float4(0, 0, 0, 1);
     
     for (uint i = 0; i < 8; i++)
     {
@@ -216,9 +216,7 @@ WorldTransformOutput DoWorldTransform(float4 position, float3 normal, float4 ble
     return output;
 }
 
-VS_OUTPUT
-    main(
-    const VS_INPUT xIn)
+VS_OUTPUT main(const VS_INPUT xIn)
 {
 	VS_OUTPUT xOut;
 
@@ -241,18 +239,88 @@ VS_OUTPUT
         lighting.Diffuse = lighting.BackDiffuse = float4(1, 1, 1, 1);
         lighting.Specular = lighting.BackSpecular = float4(0, 0, 0, 1);
     }
+
+    // Colours
+    Material material;
+    if (state.Modes.ColorVertex)
+    {
+        const int SRC_MATERIAL = 0;
+        const int SRC_COLOR1 = 1;
+        const int SRC_COLOR2 = 2;
+
+        switch (state.Modes.AmbientMaterialSource)
+        {
+            case SRC_MATERIAL:
+                material.Ambient = state.Material.Ambient;
+                break;
+            case SRC_COLOR1:
+                material.Ambient = xIn.color[0];
+                break;
+            case SRC_COLOR2:
+                material.Ambient = xIn.color[1];
+                break;
+        }
+
+        switch (state.Modes.DiffuseMaterialSource)
+        {
+            case SRC_MATERIAL:
+                material.Diffuse = state.Material.Diffuse;
+                break;
+            case SRC_COLOR1:
+                material.Diffuse = xIn.color[0];
+                break;
+            case SRC_COLOR2:
+                material.Diffuse = xIn.color[1];
+                break;
+        }
+
+        switch (state.Modes.SpecularMaterialSource)
+        {
+            case SRC_MATERIAL:
+                material.Specular = state.Material.Specular;
+                break;
+            case SRC_COLOR1:
+                material.Specular = xIn.color[0];
+                break;
+            case SRC_COLOR2:
+                material.Specular = xIn.color[1];
+                break;
+        }
+
+        switch (state.Modes.EmissiveMaterialSource)
+        {
+            case SRC_MATERIAL:
+                material.Emissive = state.Material.Emissive;
+                break;
+            case SRC_COLOR1:
+                material.Emissive = xIn.color[0];
+                break;
+            case SRC_COLOR2:
+                material.Emissive = xIn.color[1];
+                break;
+        }
+    }
+    else
+    {
+        material.Ambient = state.Modes.Ambient; // TODO correct?
+        material.Diffuse = float4(1, 1, 1, 1);
+        material.Specular = float4(0, 0, 0, 1);
+        material.Emissive = float4(0, 0, 0, 1);
+    }
+
+    xOut.oD0 = saturate(material.Ambient + (material.Diffuse * lighting.Diffuse) + material.Emissive);
+    xOut.oD1 = saturate(material.Specular * lighting.Specular);
+    // TODO backface colours
+    xOut.oB0 = saturate(lighting.BackDiffuse);
+    xOut.oB1 = saturate(lighting.BackSpecular);
+    
     // TODO fog and fog state
 	xOut.oFog = 0;
-
 
     // TODO point stuff
 	xOut.oPts = 0;
 
-    xOut.oD0 = saturate(float4(xIn.color[0], 1) * lighting.Diffuse);
-    xOut.oD1 = saturate(float4(xIn.color[1], 1) * lighting.Specular);
-    // TODO backface colours
-    xOut.oB0 = saturate(lighting.BackDiffuse);
-    xOut.oB1 = saturate(lighting.BackSpecular);
+    // xOut.oD0 = float4(world.Normal, 1);
 
 	// TODO reverse scaling for linear textures
 	xOut.oT0 = xIn.texcoord[0];

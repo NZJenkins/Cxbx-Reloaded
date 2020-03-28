@@ -7180,6 +7180,19 @@ void CxbxUpdateNativeD3DResources()
 	}
 	else {
 		g_renderStateBlock.Modes.Lighting = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_LIGHTING);
+		DWORD ambient = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_AMBIENT);
+		g_renderStateBlock.Modes.Ambient = D3DXVECTOR4(ambient & 0xFF, ambient >> 2 & 0xFF, ambient >> 4 & 0xFF, ambient >> 6 & 0xFF);
+		g_renderStateBlock.Modes.Ambient.x /= 255.f;
+		g_renderStateBlock.Modes.Ambient.y /= 255.f;
+		g_renderStateBlock.Modes.Ambient.z /= 255.f;
+		g_renderStateBlock.Modes.Ambient.w /= 255.f;
+
+		g_renderStateBlock.Modes.ColorVertex = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_COLORVERTEX);
+		g_renderStateBlock.Modes.AmbientMaterialSource = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_AMBIENTMATERIALSOURCE);
+		g_renderStateBlock.Modes.DiffuseMaterialSource = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_DIFFUSEMATERIALSOURCE);
+		g_renderStateBlock.Modes.SpecularMaterialSource = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_SPECULARMATERIALSOURCE);
+		g_renderStateBlock.Modes.EmissiveMaterialSource = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_EMISSIVEMATERIALSOURCE);
+
 		g_renderStateBlock.Modes.VertexBlend = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_VERTEXBLEND);
 
 		int slots = ceil(sizeof(RenderStateBlock) / (float)(4 * sizeof(float)));
@@ -7871,6 +7884,12 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_SetMaterial)
 )
 {
 	LOG_FUNC_ONE_ARG(pMaterial);
+
+	g_renderStateBlock.Material.Ambient = toVector(pMaterial->Ambient);
+	g_renderStateBlock.Material.Diffuse = toVector(pMaterial->Diffuse);
+	g_renderStateBlock.Material.Specular = toVector(pMaterial->Specular);
+	g_renderStateBlock.Material.Emissive = toVector(pMaterial->Emissive);
+	g_renderStateBlock.Material.Power = pMaterial->Power;
 
     HRESULT hRet = g_pD3DDevice->SetMaterial(pMaterial);
 	DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetMaterial");

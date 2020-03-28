@@ -10,14 +10,16 @@
 
 #define float4x4 D3DMATRIX
 #define float4 D3DXVECTOR4
-#define float3 D3DVECTOR
-#define float2 D3DXVECTOR2
+#define float3 alignas(16) D3DVECTOR
+#define float2 alignas(16) D3DXVECTOR2
 #define arr(name, type, length) std::array<type, length> name
-#define uint UINT
+#define uint alignas(16) UINT
+#define int alignas(16) int
 
 #else
 // HLSL
 #define arr(name, type, length) type name[length]
+#define alignas(x)
 
 #endif //  __cplusplus
 
@@ -26,7 +28,6 @@
 // i.e. vectors cannot cross a 16 byte boundary
 
 #pragma pack_matrix(row_major)
-#pragma pack 16
 struct Transforms {
     float4x4 View; // 0
     float4x4 Projection; // 1
@@ -34,7 +35,6 @@ struct Transforms {
     arr(World, float4x4, 4); // 6, 7, 8, 9
 };
 
-#pragma pack 4
 // See D3DLIGHT
 struct Light {
     float4 Diffuse;
@@ -56,15 +56,40 @@ struct Light {
     float Phi;
 };
 
-#pragma pack 4
+struct Material {
+    float4 Diffuse;
+    float4 Ambient;
+    float4 Specular;
+    float4 Emissive;
+    float Power;
+};
+
 struct Modes {
+    float4 Ambient;
+
+    uint AmbientMaterialSource;
+    uint DiffuseMaterialSource;
+    uint EmissiveMaterialSource;
+    uint SpecularMaterialSource;
+
     int Lighting;
+    int ColorVertex;
+
     int VertexBlend;
 };
 
-#pragma pack 16
 struct RenderStateBlock {
-    Transforms Transforms;
-    arr(Lights, Light, 8);
-    Modes Modes;
+    alignas(16) Transforms Transforms;
+    alignas(16) Modes Modes;
+    alignas(16) Material Material;
+    alignas(16) arr(Lights, Light, 8);
 };
+
+
+#undef float4x4
+#undef float4
+#undef float3
+#undef float2
+#undef arr
+#undef uint
+#undef int
