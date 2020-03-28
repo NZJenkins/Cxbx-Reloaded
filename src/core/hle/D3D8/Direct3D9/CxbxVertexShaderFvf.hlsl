@@ -1,7 +1,8 @@
 #include "RenderStateBlock.cpp"
 
-RenderStateBlock state : register(c214);
+RenderStateBlock state; // : register(c214);
 
+// TODO just use texcoord for everything
 // Output registers
 struct VS_INPUT
 {
@@ -31,13 +32,46 @@ struct VS_OUTPUT
 	float4 oD1  : COLOR1;    // Secondary color (front-facing)
 	float  oFog : FOG;       // Fog coordinate
 	float  oPts : PSIZE;	 // Point size
-	float4 oB0  : TEXCOORD4; // Back-facing primary colorrow_major
+	float4 oB0  : TEXCOORD4; // Back-facing primary color
 	float4 oB1  : TEXCOORD5; // Back-facing secondary color
 	float4 oT0  : TEXCOORD0; // Texture coordinate set 0
 	float4 oT1  : TEXCOORD1; // Texture coordinate set 1
 	float4 oT2  : TEXCOORD2; // Texture coordinate set 2
 	float4 oT3  : TEXCOORD3; // Texture coordinate set 3
 };
+
+struct ColorsOutput
+{
+    float4 Diffuse;
+    float4 Specular;
+    float4 BackDiffuse;
+    float4 BackSpecular;
+};
+
+ColorsOutput CalcLighting(float3 worldNormal, float3 worldPos, float3 cameraPos)
+{
+    ColorsOutput output = (ColorsOutput) 0.0;
+
+    // TODO everything
+    
+    for (int i = 0; i < 8; i++)
+    {
+        // DX11 FixedFuncEmu code
+        Light cur = state.Lights[i];
+        float3 toLight = cur.Position.xyz - worldPos;
+        float lightDist = length(toLight);
+        float fAtten = 1.0 / dot(cur.Attenuation0, float4(1, lightDist, lightDist * lightDist, 0));
+        float3 lightDir = normalize(toLight);
+        float3 halfAngle = normalize(normalize(-cameraPos) + lightDir);
+        
+        output.Diffuse += max(0, dot(lightDir, worldNormal) * cur.Diffuse * fAtten) + cur.Ambient;
+        output.Specular += max(0, pow(dot(halfAngle, worldNormal), 64) * cur.Specular * fAtten);
+    }
+
+    output.BackDiffuse = output.BackSpecular = float4(1, 1, 1, 1);
+    
+    return output;
+}
 
 VS_OUTPUT main(const VS_INPUT xIn)
 {
@@ -47,20 +81,33 @@ VS_OUTPUT main(const VS_INPUT xIn)
     float4 cameraPos = mul(worldPos, state.Transforms.View);
     xOut.oPos = mul(cameraPos, state.Transforms.Projection);
 
-	//xOut.oPos = xIn.v[0];
+    // Vertex lighting
+    if (false)
+    {
+        float3 worldNormal = normalize(mul(xIn.normal.xyz, (float3x3) state.Transforms.World));
+        // output.wNorm = worldNormal;
+        ColorsOutput cOut = CalcLighting(worldNormal, worldPos.xyz, cameraPos.xyz);
+        xOut.oD0 = cOut.Diffuse;
+        xOut.oD1 = cOut.Specular;
+        // TODO backface calcs
+        xOut.oD0 = cOut.BackDiffuse;
+        xOut.oD1 = cOut.BackSpecular;
+    }
+    else
+    {
+        xOut.oD0 = xOut.oB0 = float4(1, 1, 1, 1);
+        xOut.oD1 = xOut.oB1 = float4(0, 0, 0, 0);
 
-    xOut.oD0 = saturate(float4(xIn.color[0], 1)); //xIn.v[3]);
-    xOut.oD1 = saturate(float4(xIn.color[1], 1)); //xIn.v[4]);
-
+    }
+    // TODO fog and fog state
 	xOut.oFog = 0;
 
+
+    // TODO point stuff
 	xOut.oPts = 0;
 
-	// In D3D we need to be in the pixel shader to determine if we're using the backface or frontface
-    xOut.oB0 = 0; // saturate(xIn.v[7]);
-    xOut.oB1 = 0; // saturate(xIn.v[8]);
 
-	// TODO scale with rendertarget
+	// TODO reverse scaling for linear textures
 	xOut.oT0 = xIn.texcoord[0];
     xOut.oT1 = xIn.texcoord[1];
     xOut.oT2 = xIn.texcoord[2];

@@ -987,6 +987,8 @@ IDirect3DResource *GetHostResource(XTL::X_D3DResource *pXboxResource, DWORD D3DU
 }
 
 void SetFixedFunctionShader() {
+	LOG_INIT
+
 	static IDirect3DVertexShader9* fvfShader = nullptr;
 
 	if (!fvfShader) {
@@ -996,6 +998,13 @@ void SetFixedFunctionShader() {
 	}
 
 	g_pD3DDevice->SetVertexShader(fvfShader);
+
+	auto hRet = g_pD3DDevice->SetVertexShaderConstantF(
+		0, //CXBX_D3DVS_FIXEDFUNCSTATE,
+		(float*)&g_renderStateBlock,
+		sizeof(RenderStateBlock) / (4 * sizeof(float)));
+
+	DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetVertexShaderConstantF render state block");
 }
 
 void SetCxbxVertexShader(CxbxVertexShader* pCxbxVertexShader) {
@@ -7138,11 +7147,6 @@ void CxbxUpdateNativeD3DResources()
 
     EmuUpdateActiveTextureStages();
 
-	g_pD3DDevice->SetVertexShaderConstantF(
-		CXBX_D3DVS_FIXEDFUNCSTATE,
-		(float*)&g_renderStateBlock,
-		sizeof(RenderStateBlock) / (4 * sizeof(float)));
-
 	// Some titles set Vertex Shader constants directly via pushbuffers rather than through D3D
 	// We handle that case by updating any constants that have the dirty flag set on the nv2a.
 	auto nv2a = g_NV2A->GetDeviceState();
@@ -7701,6 +7705,15 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_DrawIndexedVerticesUP)
 	CxbxHandleXboxCallbacks();
 }
 
+
+// Keep track of the last 8 lights set
+std::array<XTL::X_D3DLIGHT8, 4096> lightIndices = {};
+int lastLightIndex = -1;
+
+D3DXVECTOR4 toVector(D3DCOLORVALUE val) {
+	return D3DXVECTOR4(val.r, val.g, val.b, val.a);
+}
+
 // ******************************************************************
 // * patch: D3DDevice_SetLight
 // ******************************************************************
@@ -7717,8 +7730,28 @@ HRESULT WINAPI XTL::EMUPATCH(D3DDevice_SetLight)
 
 	XB_TRMP(D3DDevice_SetLight)(Index, pLight);
 
+	// TODO keep track of the last 8 active lights?
+	if (Index >= 0 && Index < g_renderStateBlock.Lights.size()) {
+		auto light = &g_renderStateBlock.Lights[Index];
+
+		// Map D3D light to state struct
+		light->Type = pLight->Type;
+		light->Diffuse = toVector(pLight->Diffuse);
+		light->Specular = toVector(pLight->Specular);
+		light->Ambient = toVector(pLight->Ambient);
+		light->Position = pLight->Position;
+		light->Direction = pLight->Direction;
+		light->Range = pLight->Range;
+		light->Falloff = pLight->Falloff;
+		light->Attenuation0 = pLight->Attenuation0;
+		light->Attenuation1 = pLight->Attenuation1;
+		light->Attenuation2 = pLight->Attenuation2;
+		light->Theta = pLight->Theta;
+		light->Phi = pLight->Phi;
+	}
+
     HRESULT hRet = g_pD3DDevice->SetLight(Index, pLight);
-	DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetLight");    
+	DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetLight");
 
     return hRet;
 }
@@ -7752,6 +7785,9 @@ HRESULT WINAPI XTL::EMUPATCH(D3DDevice_LightEnable)
 		LOG_FUNC_END;
 
 	XB_TRMP(D3DDevice_LightEnable)(Index, bEnable);
+
+	if (Index >= 0 && Index < g_renderStateBlock.Lights.size())
+		g_renderStateBlock.Lights[Index].Enabled = bEnable;
 
     HRESULT hRet = g_pD3DDevice->LightEnable(Index, bEnable);
 	DEBUG_D3DRESULT(hRet, "g_pD3DDevice->LightEnable");    
