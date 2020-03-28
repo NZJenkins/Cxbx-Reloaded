@@ -52,9 +52,37 @@ struct ColorsOutput
 
 // useful reference https://drivers.amd.com/misc/samples/dx9/FixedFuncShader.pdf
 
-ColorsOutput DoPointLight(Light l)
+ColorsOutput DoPointLight(Light l, float3 worldNormal, float3 worldPos)
 {
-    
+    ColorsOutput o;
+    o.Diffuse = l.Ambient;
+    o.BackDiffuse = l.Ambient;
+    o.Specular = 0;
+    o.BackSpecular = 0;
+
+    float3 toLight = worldPos - l.Position;
+    float lightDist = length(toLight);
+    // A(Constant) + A(Linear) * dist + A(Exp) * dist^2
+    float attenuation =
+        1 / (l.Attenuation0
+        + l.Attenuation1 * lightDist
+        + l.Attenuation2 * lightDist * lightDist);
+
+    float NdotL = dot(worldNormal, normalize(toLight));
+    float intensity = abs(NdotL * attenuation);
+
+    if (NdotL >= 0.f)
+    {
+        o.Diffuse += intensity * l.Diffuse;
+    }
+    else
+    {
+        o.BackDiffuse += intensity * l.Diffuse;
+    }
+
+    // TODO specular
+
+    return o;
 }
 
 ColorsOutput DoDirectionalLight(Light l, float3 worldNormal)
@@ -66,32 +94,21 @@ ColorsOutput DoDirectionalLight(Light l, float3 worldNormal)
     o.BackSpecular = 0;
 
     // Intensity from N . L
-    float intensity = dot(worldNormal, -normalize(l.Direction));
-    float lightDiffuse = intensity * l.Diffuse;
+    float NdotL = dot(worldNormal, -normalize(l.Direction));
+    float lightDiffuse = abs(NdotL * l.Diffuse);
 
     // Apply light contribution to front or back face
     // as the case may be
-    if(intensity > 0)
+    if (NdotL > 0)
         o.Diffuse += lightDiffuse;
-    else if (intensity < 0)
-        o.BackDiffuse += lightDiffuse;
+    else if (NdotL < 0)
+        o.BackDiffuse = lightDiffuse;
 
     // TODO specular
 
     return o;
 }
 
-        // DX11 FixedFuncEmu code
-//Light cur = state.Lights[i];
-//float3 toLight = cur.Position.xyz - worldPos;
-//float lightDist = length(toLight);
-//float fAtten = 1.0 / dot(cur.Attenuation0, float4(1, lightDist, lightDist * lightDist, 0));
-//float3 lightDir = normalize(toLight);
-//float3 halfAngle = normalize(normalize(-cameraPos) + lightDir);
-        
-//        output.Diffuse += max(0, dot(lightDir, worldNormal) * cur.Diffuse * fAtten) + cur.
-//Ambient;
-//        output.Specular += max(0, pow(dot(halfAngle, worldNormal), 64) * cur.Specular * fAtten);
 
 ColorsOutput CalcLighting(float3 worldNormal, float3 worldPos, float3 cameraPos)
 {
@@ -124,7 +141,7 @@ ColorsOutput CalcLighting(float3 worldNormal, float3 worldPos, float3 cameraPos)
                 isLight = false;
                 break;
             case LIGHT_TYPE_POINT:
-                currentLightOutput = todo; //DoPointLight(currentLight, worldNormal);
+                currentLightOutput = DoPointLight(currentLight, worldNormal, worldPos);
                 break;
             case LIGHT_TYPE_SPOT:
                 currentLightOutput = todo; //DoSpot(currentLight);
