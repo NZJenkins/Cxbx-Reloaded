@@ -1000,8 +1000,6 @@ void SetVertexShaderConstant(int index, const float* value) {
 bool isFixedFunctionMode = false;
 
 void SetFixedFunctionShader() {
-	LOG_INIT
-
 	isFixedFunctionMode = true;
 
 	static IDirect3DVertexShader9* fvfShader = nullptr;
@@ -1013,13 +1011,6 @@ void SetFixedFunctionShader() {
 	}
 
 	g_pD3DDevice->SetVertexShader(fvfShader);
-
-	auto hRet = g_pD3DDevice->SetVertexShaderConstantF(
-		0, //CXBX_D3DVS_FIXEDFUNCSTATE,
-		(float*)&g_renderStateBlock,
-		sizeof(RenderStateBlock) / (4 * sizeof(float)));
-
-	DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetVertexShaderConstantF render state block");
 }
 
 void SetCxbxVertexShader(CxbxVertexShader* pCxbxVertexShader) {
@@ -7170,10 +7161,10 @@ void CxbxUpdateNativeD3DResources()
 
     EmuUpdateActiveTextureStages();
 
+	auto nv2a = g_NV2A->GetDeviceState();
 	if (!isFixedFunctionMode) {
 		// Some titles set Vertex Shader constants directly via pushbuffers rather than through D3D
 		// We handle that case by updating any constants that have the dirty flag set on the nv2a.
-		auto nv2a = g_NV2A->GetDeviceState();
 		for (int i = 0; i < X_D3DVS_CONSTREG_COUNT; i++) {
 			// Skip vOffset and vScale constants, we don't want our values to be overwritten by accident
 			if (i == X_D3DSCM_RESERVED_CONSTANT_OFFSET_CORRECTED || i == X_D3DSCM_RESERVED_CONSTANT_SCALE_CORRECTED) {
@@ -7186,6 +7177,17 @@ void CxbxUpdateNativeD3DResources()
 			}
 		}
 		g_pD3DDevice->SetVertexShaderConstantF(0, (float*)&g_vshConstants, X_D3DVS_CONSTREG_COUNT);
+	}
+	else {
+		g_renderStateBlock.Modes.Lighting = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_LIGHTING);
+		g_renderStateBlock.Modes.VertexBlend = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_VERTEXBLEND);
+
+		int slots = ceil(sizeof(RenderStateBlock) / (float)(4 * sizeof(float)));
+
+		auto hRet = g_pD3DDevice->SetVertexShaderConstantF(
+			0, //CXBX_D3DVS_FIXEDFUNCSTATE,
+			(float*)&g_renderStateBlock,
+			slots);
 	}
 
     // NOTE: Order is important here

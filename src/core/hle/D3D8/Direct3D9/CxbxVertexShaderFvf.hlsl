@@ -155,7 +155,7 @@ VS_OUTPUT main(const VS_INPUT xIn)
     xOut.oPos = mul(cameraPos, state.Transforms.Projection);
 
     // Vertex lighting
-    if (false)
+    if (state.Modes.Lighting)
     {
         float3 worldNormal = normalize(mul(xIn.normal.xyz, (float3x3) state.Transforms.World));
         // output.wNorm = worldNormal;
@@ -170,7 +170,6 @@ VS_OUTPUT main(const VS_INPUT xIn)
     {
         xOut.oD0 = xOut.oB0 = float4(1, 1, 1, 1);
         xOut.oD1 = xOut.oB1 = float4(0, 0, 0, 0);
-
     }
     // TODO fog and fog state
 	xOut.oFog = 0;
@@ -179,6 +178,10 @@ VS_OUTPUT main(const VS_INPUT xIn)
     // TODO point stuff
 	xOut.oPts = 0;
 
+    xOut.oD0 = saturate(xOut.oD0);
+    xOut.oD1 = saturate(xOut.oD1);
+    xOut.oB0 = saturate(xOut.oB0);
+    xOut.oB1 = saturate(xOut.oB1);
 
 	// TODO reverse scaling for linear textures
 	xOut.oT0 = xIn.texcoord[0];

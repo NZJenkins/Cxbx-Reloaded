@@ -62,8 +62,15 @@ struct Light {
     float Phi;
 };
 
+#pragma pack 4
+struct Modes {
+    int Lighting;
+    int VertexBlend;
+};
+
 #pragma pack 16
 struct RenderStateBlock {
     Transforms Transforms;
     arr(Lights, Light, 8);
+    Modes Modes;
 };
