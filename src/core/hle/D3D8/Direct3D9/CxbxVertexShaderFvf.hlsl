@@ -113,11 +113,11 @@ LightingOutput CalcLighting(float3 worldNormal, float3 worldPos, float3 cameraPo
     const int LIGHT_TYPE_DIRECTIONAL = 3;
 
     LightingOutput totalLightOutput;
-    totalLightOutput.Ambient = float4(0, 0, 0, 0);
-    totalLightOutput.Diffuse = float4(0, 0, 0, 0);
-    totalLightOutput.BackDiffuse = float4(0, 0, 0, 0);
-    totalLightOutput.Specular = float4(0, 0, 0, 0);
-    totalLightOutput.BackSpecular = float4(0, 0, 0, 0);
+    totalLightOutput.Ambient = float4(0, 0, 0, 1);
+    totalLightOutput.Diffuse = float4(0, 0, 0, 1);
+    totalLightOutput.BackDiffuse = float4(0, 0, 0, 1);
+    totalLightOutput.Specular = float4(0, 0, 0, 1);
+    totalLightOutput.BackSpecular = float4(0, 0, 0, 1);
     
     
     for (uint i = 0; i < 8; i++)
@@ -217,7 +217,7 @@ VS_OUTPUT main(const VS_INPUT xIn)
     }
     else
     {
-        lighting.Ambient = float4(0, 0, 0, 0);
+        lighting.Ambient = float4(0, 0, 0, 1);
         lighting.Diffuse = lighting.BackDiffuse = float4(1, 1, 1, 1);
         lighting.Specular = lighting.BackSpecular = float4(0, 0, 0, 1);
     }
