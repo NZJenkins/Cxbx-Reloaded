@@ -42,8 +42,9 @@ struct VS_OUTPUT
 	float4 oT3  : TEXCOORD3; // Texture coordinate set 3
 };
 
-struct ColorsOutput
+struct LightingOutput
 {
+    float4 Ambient;
     float4 Diffuse;
     float4 Specular;
     float4 BackDiffuse;
@@ -52,14 +53,13 @@ struct ColorsOutput
 
 // useful reference https://drivers.amd.com/misc/samples/dx9/FixedFuncShader.pdf
 
-ColorsOutput DoPointLight(Light l, float3 worldNormal, float3 worldPos)
+LightingOutput DoPointLight(Light l, float3 worldNormal, float3 worldPos)
 {
-    ColorsOutput o;
-    o.Diffuse = l.Ambient;
-    o.BackDiffuse = l.Ambient;
-    o.Specular = 0;
-    o.BackSpecular = 0;
-
+    LightingOutput o;
+    o.Ambient = l.Ambient;
+    o.Diffuse = o.BackDiffuse = float4(0, 0, 0, 0);
+    o.Specular = o.BackSpecular= float4(0, 0, 0, 0);
+    
     float3 toLight = worldPos - l.Position;
     float lightDist = length(toLight);
     // A(Constant) + A(Linear) * dist + A(Exp) * dist^2
@@ -69,29 +69,24 @@ ColorsOutput DoPointLight(Light l, float3 worldNormal, float3 worldPos)
         + l.Attenuation2 * lightDist * lightDist);
 
     float NdotL = dot(worldNormal, normalize(toLight));
-    float intensity = abs(NdotL * attenuation);
+    float lightDiffuse = abs(NdotL * attenuation) * l.Diffuse;;
 
     if (NdotL >= 0.f)
-    {
-        o.Diffuse += intensity * l.Diffuse;
-    }
+        o.Diffuse = lightDiffuse;
     else
-    {
-        o.BackDiffuse += intensity * l.Diffuse;
-    }
+        o.BackDiffuse = lightDiffuse;
 
     // TODO specular
 
     return o;
 }
 
-ColorsOutput DoDirectionalLight(Light l, float3 worldNormal)
+LightingOutput DoDirectionalLight(Light l, float3 worldNormal)
 {
-    ColorsOutput o;
-    o.Diffuse = l.Ambient;
-    o.BackDiffuse = l.Ambient;
-    o.Specular = 0;
-    o.BackSpecular = 0;
+    LightingOutput o;
+    o.Ambient = l.Ambient;
+    o.Diffuse = o.BackDiffuse = float4(0, 0, 0, 0);
+    o.Specular = o.BackSpecular = float4(0, 0, 0, 0);
 
     // Intensity from N . L
     float NdotL = dot(worldNormal, -normalize(l.Direction));
@@ -110,29 +105,25 @@ ColorsOutput DoDirectionalLight(Light l, float3 worldNormal)
 }
 
 
-ColorsOutput CalcLighting(float3 worldNormal, float3 worldPos, float3 cameraPos)
+LightingOutput CalcLighting(float3 worldNormal, float3 worldPos, float3 cameraPos)
 {
     const uint LIGHT_TYPE_NONE        = 0;
     const uint LIGHT_TYPE_POINT       = 1;
     const uint LIGHT_TYPE_SPOT        = 2;
     const uint LIGHT_TYPE_DIRECTIONAL = 3;
 
-    ColorsOutput todo;
-    todo.Diffuse = float4(1, 0, 0, 1);
-    todo.Specular = float4(0, 1, 0, 1);
-    todo.BackDiffuse = float4(0, 0, 1, 1);
-    todo.BackSpecular = float4(1, 1, 0, 1);
-
-    ColorsOutput totalLightOutput;
-    totalLightOutput.Diffuse = float4(0, 0, 0, 1);
-    totalLightOutput.BackDiffuse = float4(0, 0, 0, 1);
-    totalLightOutput.Specular = float4(0, 0, 0, 1);
-    totalLightOutput.BackSpecular = float4(0, 0, 0, 1);
+    LightingOutput totalLightOutput;
+    totalLightOutput.Ambient = float4(0, 0, 0, 0);
+    totalLightOutput.Diffuse = float4(0, 0, 0, 0);
+    totalLightOutput.BackDiffuse = float4(0, 0, 0, 0);
+    totalLightOutput.Specular = float4(0, 0, 0, 0);
+    totalLightOutput.BackSpecular = float4(0, 0, 0, 0);
+    
     
     for (uint i = 0; i < 8; i++)
     {
         const Light currentLight = state.Lights[i];
-        ColorsOutput currentLightOutput;
+        LightingOutput currentLightOutput;
         bool isLight = true;
 
         switch (currentLight.Type)
@@ -144,7 +135,7 @@ ColorsOutput CalcLighting(float3 worldNormal, float3 worldPos, float3 cameraPos)
                 currentLightOutput = DoPointLight(currentLight, worldNormal, worldPos);
                 break;
             case LIGHT_TYPE_SPOT:
-                currentLightOutput = todo; //DoSpot(currentLight);
+                isLight = false; //DoSpot(currentLight);
                 break;
             case LIGHT_TYPE_DIRECTIONAL:
                 currentLightOutput = DoDirectionalLight(currentLight, worldNormal);
@@ -153,7 +144,8 @@ ColorsOutput CalcLighting(float3 worldNormal, float3 worldPos, float3 cameraPos)
 
         if (!isLight)
             continue;
-        
+
+        totalLightOutput.Ambient += currentLightOutput.Ambient;
         totalLightOutput.Diffuse += currentLightOutput.Diffuse;
         totalLightOutput.BackDiffuse += currentLightOutput.BackDiffuse;
         totalLightOutput.Specular += currentLightOutput.Specular;
@@ -228,7 +220,7 @@ VS_OUTPUT main(const VS_INPUT xIn)
     xOut.oPos = mul(cameraPos, state.Transforms.Projection);
 
     // Vertex lighting
-    ColorsOutput lighting;
+    LightingOutput lighting;
     if (state.Modes.Lighting)
     {
         float3 worldNormal = normalize(world.Normal);
@@ -236,6 +228,7 @@ VS_OUTPUT main(const VS_INPUT xIn)
     }
     else
     {
+        lighting.Ambient = float4(0, 0, 0, 0);
         lighting.Diffuse = lighting.BackDiffuse = float4(1, 1, 1, 1);
         lighting.Specular = lighting.BackSpecular = float4(0, 0, 0, 1);
     }
@@ -247,6 +240,8 @@ VS_OUTPUT main(const VS_INPUT xIn)
         const int SRC_MATERIAL = 0;
         const int SRC_COLOR1 = 1;
         const int SRC_COLOR2 = 2;
+
+        // FIXME "If either AMBIENTMATERIALSOURCE option is used, and the vertex color is not provided, then the material ambient color is used."
 
         switch (state.Modes.AmbientMaterialSource)
         {
@@ -308,11 +303,19 @@ VS_OUTPUT main(const VS_INPUT xIn)
         material.Emissive = float4(0, 0, 0, 1);
     }
 
-    xOut.oD0 = saturate(material.Ambient + (material.Diffuse * lighting.Diffuse) + material.Emissive);
-    xOut.oD1 = saturate(material.Specular * lighting.Specular);
+    // TODO implement material backface diffuse & specular
+    float4 ambient = material.Ambient * (state.Modes.Ambient + lighting.Ambient);
+    float4 diffuse = material.Diffuse * lighting.Diffuse;
+    float4 backDiffuse = float4(1, 1, 1, 1) * lighting.BackDiffuse;
+    float4 specular = material.Specular * lighting.Specular;
+    float4 backSpecular = float4(0, 0, 0, 0) * lighting.BackSpecular;
+    float4 emissive = material.Emissive;
+
+    xOut.oD0 = saturate(ambient + diffuse + emissive);
+    xOut.oD1 = saturate(specular);
     // TODO backface colours
-    xOut.oB0 = saturate(lighting.BackDiffuse);
-    xOut.oB1 = saturate(lighting.BackSpecular);
+    xOut.oB0 = saturate(ambient + backDiffuse + emissive);
+    xOut.oB1 = saturate(backSpecular);
     
     // TODO fog and fog state
 	xOut.oFog = 0;
