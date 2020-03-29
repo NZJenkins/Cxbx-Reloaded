@@ -297,10 +297,10 @@ VS_OUTPUT main(const VS_INPUT xIn)
     }
     else
     {
-        material.Ambient = state.Modes.Ambient; // TODO correct?
-        material.Diffuse = float4(1, 1, 1, 1);
-        material.Specular = float4(0, 0, 0, 1);
-        material.Emissive = float4(0, 0, 0, 1);
+        material.Ambient = state.Material.Ambient;
+        material.Diffuse = state.Material.Diffuse;
+        material.Specular = state.Material.Specular;
+        material.Emissive = state.Material.Emissive;
     }
 
     // TODO implement material backface diffuse & specular
@@ -316,7 +316,7 @@ VS_OUTPUT main(const VS_INPUT xIn)
     // TODO backface colours
     xOut.oB0 = saturate(ambient + backDiffuse + emissive);
     xOut.oB1 = saturate(backSpecular);
-    
+
     // TODO fog and fog state
 	xOut.oFog = 0;
 
