@@ -7154,6 +7154,16 @@ void EmuUpdateActiveTextureStages()
 	}
 }
 
+D3DXVECTOR4 toVector(D3DCOLOR color) {
+	D3DXVECTOR4 v;
+	// ARGB to XYZW
+	v.w = (color >> 24 & 0xFF) / 255.f;
+	v.x = (color >> 16 & 0xFF) / 255.f;
+	v.y = (color >>  8 & 0xFF) / 255.f;
+	v.z = (color >>  0 & 0xFF) / 255.f;
+	return v;
+}
+
 void CxbxUpdateNativeD3DResources()
 {
 	// Before we start, make sure our resource cache stays limited in size
@@ -7180,12 +7190,7 @@ void CxbxUpdateNativeD3DResources()
 	}
 	else {
 		g_renderStateBlock.Modes.Lighting = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_LIGHTING);
-		DWORD ambient = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_AMBIENT);
-		g_renderStateBlock.Modes.Ambient = D3DXVECTOR4(ambient & 0xFF, ambient >> 2 & 0xFF, ambient >> 4 & 0xFF, ambient >> 6 & 0xFF);
-		g_renderStateBlock.Modes.Ambient.x /= 255.f;
-		g_renderStateBlock.Modes.Ambient.y /= 255.f;
-		g_renderStateBlock.Modes.Ambient.z /= 255.f;
-		g_renderStateBlock.Modes.Ambient.w /= 255.f;
+		g_renderStateBlock.Modes.Ambient = toVector(XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_AMBIENT));
 
 		g_renderStateBlock.Modes.ColorVertex = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_COLORVERTEX);
 		g_renderStateBlock.Modes.AmbientMaterialSource = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_AMBIENTMATERIALSOURCE);
