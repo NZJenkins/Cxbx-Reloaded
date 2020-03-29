@@ -10,11 +10,10 @@
 
 #define float4x4 D3DMATRIX
 #define float4 D3DXVECTOR4
-#define float3 alignas(16) D3DVECTOR
-#define float2 alignas(16) D3DXVECTOR2
+#define float3 D3DVECTOR
+#define float2 D3DXVECTOR2
 #define arr(name, type, length) std::array<type, length> name
-#define uint alignas(16) UINT
-#define int alignas(16) int
+#define uint unsigned int
 
 #else
 // HLSL
@@ -25,7 +24,10 @@
 
 // Shared HLSL structures
 // Taking care with packing rules
-// i.e. vectors cannot cross a 16 byte boundary
+// In VS_3_0, packing works in mysterious ways
+// * Structs inside arrays are not packed
+// * Values used in flow control are not packed(?)
+// We don't get documented packing until vs_4_0
 
 #pragma pack_matrix(row_major)
 struct Transforms {
@@ -41,19 +43,19 @@ struct Light {
     float4 Specular;
     float4 Ambient;
     // 16 bytes
-    float3 Position;
-    float Range;
+    alignas(16) float3 Position;
+    alignas(16) float Range;
     // 16 bytes
-    float3 Direction;
-    uint Type; // 1=Point, 2=Spot, 3=Directional
+    alignas(16) float3 Direction;
+    alignas(16) float Type; // 1=Point, 2=Spot, 3=Directional
     //
-    float Falloff;
-    float Attenuation0;
-    float Attenuation1;
-    float Attenuation2;
+    alignas(16) float Falloff;
+    alignas(16) float Attenuation0;
+    alignas(16) float Attenuation1;
+    alignas(16) float Attenuation2;
     //
-    float Theta;
-    float Phi;
+    alignas(16) float Theta;
+    alignas(16) float Phi;
 };
 
 struct Material {
@@ -61,30 +63,30 @@ struct Material {
     float4 Ambient;
     float4 Specular;
     float4 Emissive;
+
     float Power;
 };
 
 struct Modes {
     float4 Ambient;
 
-    uint AmbientMaterialSource;
-    uint DiffuseMaterialSource;
-    uint EmissiveMaterialSource;
-    uint SpecularMaterialSource;
+    // Can't be packed due to use in flow control
+    alignas(16) int AmbientMaterialSource;
+    alignas(16) int DiffuseMaterialSource;
+    alignas(16) int SpecularMaterialSource;
+    alignas(16) int EmissiveMaterialSource;
 
-    int Lighting;
-    int ColorVertex;
-
-    int VertexBlend;
+    alignas(16) int Lighting;
+    alignas(16) int ColorVertex;
+    alignas(16) int VertexBlend;
 };
 
 struct RenderStateBlock {
     alignas(16) Transforms Transforms;
-    alignas(16) Modes Modes;
-    alignas(16) Material Material;
     alignas(16) arr(Lights, Light, 8);
+    alignas(16) Material Material;
+    alignas(16) Modes Modes;
 };
-
 
 #undef float4x4
 #undef float4
@@ -92,4 +94,3 @@ struct RenderStateBlock {
 #undef float2
 #undef arr
 #undef uint
-#undef int

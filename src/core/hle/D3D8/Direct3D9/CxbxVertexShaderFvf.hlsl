@@ -107,10 +107,10 @@ LightingOutput DoDirectionalLight(Light l, float3 worldNormal)
 
 LightingOutput CalcLighting(float3 worldNormal, float3 worldPos, float3 cameraPos)
 {
-    const uint LIGHT_TYPE_NONE        = 0;
-    const uint LIGHT_TYPE_POINT       = 1;
-    const uint LIGHT_TYPE_SPOT        = 2;
-    const uint LIGHT_TYPE_DIRECTIONAL = 3;
+    const int LIGHT_TYPE_NONE        = 0;
+    const int LIGHT_TYPE_POINT       = 1;
+    const int LIGHT_TYPE_SPOT        = 2;
+    const int LIGHT_TYPE_DIRECTIONAL = 3;
 
     LightingOutput totalLightOutput;
     totalLightOutput.Ambient = float4(0, 0, 0, 0);
@@ -124,25 +124,14 @@ LightingOutput CalcLighting(float3 worldNormal, float3 worldPos, float3 cameraPo
     {
         const Light currentLight = state.Lights[i];
         LightingOutput currentLightOutput;
-        bool isLight = true;
 
-        switch (currentLight.Type)
-        {
-            case LIGHT_TYPE_NONE:
-                isLight = false;
-                break;
-            case LIGHT_TYPE_POINT:
-                currentLightOutput = DoPointLight(currentLight, worldNormal, worldPos);
-                break;
-            case LIGHT_TYPE_SPOT:
-                isLight = false; //DoSpot(currentLight);
-                break;
-            case LIGHT_TYPE_DIRECTIONAL:
-                currentLightOutput = DoDirectionalLight(currentLight, worldNormal);
-                break;
-        }
-
-        if (!isLight)
+        if(currentLight.Type == LIGHT_TYPE_POINT)
+            currentLightOutput = DoPointLight(currentLight, worldNormal, worldPos);
+        else if(currentLight.Type == LIGHT_TYPE_SPOT)
+            continue;
+        else if (currentLight.Type == LIGHT_TYPE_DIRECTIONAL)
+            currentLightOutput = DoDirectionalLight(currentLight, worldNormal);
+        else
             continue;
 
         totalLightOutput.Ambient += currentLightOutput.Ambient;
@@ -242,58 +231,33 @@ VS_OUTPUT main(const VS_INPUT xIn)
         const int SRC_COLOR2 = 2;
 
         // FIXME "If either AMBIENTMATERIALSOURCE option is used, and the vertex color is not provided, then the material ambient color is used."
+        if(state.Modes.AmbientMaterialSource == SRC_MATERIAL)
+            material.Ambient = state.Material.Ambient;
+        else if(state.Modes.AmbientMaterialSource == SRC_COLOR1)
+            material.Ambient = xIn.color[0];
+        else
+            material.Ambient = xIn.color[1];
 
-        switch (state.Modes.AmbientMaterialSource)
-        {
-            case SRC_MATERIAL:
-                material.Ambient = state.Material.Ambient;
-                break;
-            case SRC_COLOR1:
-                material.Ambient = xIn.color[0];
-                break;
-            case SRC_COLOR2:
-                material.Ambient = xIn.color[1];
-                break;
-        }
+        if (state.Modes.AmbientMaterialSource == SRC_MATERIAL)
+            material.Diffuse = state.Material.Diffuse;
+        else if (state.Modes.DiffuseMaterialSource == SRC_COLOR1)
+            material.Diffuse = xIn.color[0];
+        else
+            material.Diffuse = xIn.color[1];
 
-        switch (state.Modes.DiffuseMaterialSource)
-        {
-            case SRC_MATERIAL:
-                material.Diffuse = state.Material.Diffuse;
-                break;
-            case SRC_COLOR1:
-                material.Diffuse = xIn.color[0];
-                break;
-            case SRC_COLOR2:
-                material.Diffuse = xIn.color[1];
-                break;
-        }
+        if (state.Modes.SpecularMaterialSource == SRC_MATERIAL)
+            material.Specular = state.Material.Specular;
+        else if (state.Modes.SpecularMaterialSource == SRC_COLOR1)
+            material.Specular = xIn.color[0];
+        else
+            material.Specular = xIn.color[1];
 
-        switch (state.Modes.SpecularMaterialSource)
-        {
-            case SRC_MATERIAL:
-                material.Specular = state.Material.Specular;
-                break;
-            case SRC_COLOR1:
-                material.Specular = xIn.color[0];
-                break;
-            case SRC_COLOR2:
-                material.Specular = xIn.color[1];
-                break;
-        }
-
-        switch (state.Modes.EmissiveMaterialSource)
-        {
-            case SRC_MATERIAL:
-                material.Emissive = state.Material.Emissive;
-                break;
-            case SRC_COLOR1:
-                material.Emissive = xIn.color[0];
-                break;
-            case SRC_COLOR2:
-                material.Emissive = xIn.color[1];
-                break;
-        }
+        if (state.Modes.EmissiveMaterialSource == SRC_MATERIAL)
+            material.Emissive = state.Material.Emissive;
+        else if (state.Modes.EmissiveMaterialSource == SRC_COLOR1)
+            material.Emissive = xIn.color[0];
+        else
+            material.Emissive = xIn.color[1];
     }
     else
     {
