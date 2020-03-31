@@ -7164,6 +7164,8 @@ D3DXVECTOR4 toVector(D3DCOLOR color) {
 	return v;
 }
 
+void UpdateLightState(int);
+
 void CxbxUpdateNativeD3DResources()
 {
 	// Before we start, make sure our resource cache stays limited in size
@@ -7199,6 +7201,10 @@ void CxbxUpdateNativeD3DResources()
 		g_renderStateBlock.Modes.EmissiveMaterialSource = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_EMISSIVEMATERIALSOURCE);
 
 		g_renderStateBlock.Modes.VertexBlend = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_VERTEXBLEND);
+
+		for (int i = 0; i < g_renderStateBlock.Lights.size(); i++) {
+			UpdateLightState(i);
+		}
 
 		int slots = ceil(sizeof(RenderStateBlock) / (float)(4 * sizeof(float)));
 
@@ -7812,7 +7818,8 @@ public:
 				if (!enable) {
 					// Disable this light and move to the end
 					EnabledLights[i] = -1;
-					std::rotate(std::begin(EnabledLights) + i, std::begin(EnabledLights) + i + 1, std::end(EnabledLights));
+					if(i != EnabledLights.size() - 1) // make sure this isn't already the last element
+						std::rotate(std::begin(EnabledLights) + i, std::begin(EnabledLights) + i + 1, std::end(EnabledLights));
 				}
 				return -1;
 			}
@@ -7822,6 +7829,9 @@ public:
 				return i;
 			}
 		}
+
+		if (!enable) // we didn't disable anything
+			return -1;
 
 		// Replace the oldest element and move to end
 		EnabledLights[0] = index;
@@ -7836,9 +7846,16 @@ D3DXVECTOR4 toVector(D3DCOLORVALUE val) {
 
 FakeD3DState fakeD3DState = FakeD3DState();
 
-void UpdateLightState(int lightIndex, int enabledLightsIndex) {
-		auto d3dLight = &fakeD3DState.Lights[lightIndex];
+void UpdateLightState(int enabledLightsIndex) {
+		auto d3dLightIndex = fakeD3DState.EnabledLights[enabledLightsIndex];
 		auto light = &g_renderStateBlock.Lights[enabledLightsIndex];
+
+		if (d3dLightIndex == -1) {
+			light->Type = 0; // Disable the light
+			return;
+		}
+
+		auto d3dLight = &fakeD3DState.Lights[d3dLightIndex];
 
 		// Map D3D light to state struct
 		light->Type = (int) d3dLight->Type;
@@ -7917,7 +7934,6 @@ HRESULT WINAPI XTL::EMUPATCH(D3DDevice_LightEnable)
 	XB_TRMP(D3DDevice_LightEnable)(Index, bEnable);
 
 	auto enabledLightIndex = fakeD3DState.EnableLight(Index, bEnable);
-	UpdateLightState(Index, enabledLightIndex);
 
     HRESULT hRet = g_pD3DDevice->LightEnable(Index, bEnable);
 	DEBUG_D3DRESULT(hRet, "g_pD3DDevice->LightEnable");    
