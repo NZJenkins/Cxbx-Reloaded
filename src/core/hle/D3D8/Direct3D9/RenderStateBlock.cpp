@@ -13,7 +13,6 @@
 #define float3 D3DVECTOR
 #define float2 D3DXVECTOR2
 #define arr(name, type, length) std::array<type, length> name
-#define uint unsigned int
 
 #else
 // HLSL
@@ -71,14 +70,14 @@ struct Modes {
     float4 Ambient;
 
     // Can't be packed due to use in flow control
-    alignas(16) int AmbientMaterialSource;
-    alignas(16) int DiffuseMaterialSource;
-    alignas(16) int SpecularMaterialSource;
-    alignas(16) int EmissiveMaterialSource;
+    alignas(16) float AmbientMaterialSource;
+    alignas(16) float DiffuseMaterialSource;
+    alignas(16) float SpecularMaterialSource;
+    alignas(16) float EmissiveMaterialSource;
 
-    alignas(16) int Lighting;
-    alignas(16) int ColorVertex;
-    alignas(16) int VertexBlend;
+    alignas(16) float Lighting;
+    alignas(16) float ColorVertex;
+    alignas(16) float VertexBlend;
 };
 
 struct RenderStateBlock {
@@ -93,4 +92,3 @@ struct RenderStateBlock {
 #undef float3
 #undef float2
 #undef arr
-#undef uint
