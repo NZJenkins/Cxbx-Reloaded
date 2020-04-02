@@ -113,6 +113,7 @@ static bool                         g_bHack_UnlockFramerate = false; // ignore t
 static bool                         g_bHasDepth = false;    // Does device have a Depth Buffer?
 static bool                         g_bHasStencil = false;  // Does device have a Stencil Buffer?
 static DWORD						g_dwPrimPerFrame = 0;	// Number of primitives within one frame
+static bool                         g_useFixedFunctionShader = true;
 
 static Settings::s_video            g_XBVideo;
 
@@ -1001,6 +1002,11 @@ bool isFixedFunctionMode = false;
 
 void SetFixedFunctionShader() {
 	isFixedFunctionMode = true;
+
+	if (!g_useFixedFunctionShader) {
+		g_pD3DDevice->SetVertexShader(nullptr);
+		return;
+	}
 
 	static IDirect3DVertexShader9* fvfShader = nullptr;
 
@@ -2017,6 +2023,10 @@ static LRESULT WINAPI EmuMsgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPar
             {
                 VertexBufferConverter.PrintStats();
             }
+			else if (wParam == VK_F2)
+			{
+				g_useFixedFunctionShader = !g_useFixedFunctionShader;
+			}
             else if (wParam == VK_F6)
             {
                 // For some unknown reason, F6 isn't handled in WndMain::WndProc
