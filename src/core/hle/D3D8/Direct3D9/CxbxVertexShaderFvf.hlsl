@@ -197,6 +197,57 @@ WorldTransformOutput DoWorldTransform(float4 position, float3 normal, float4 ble
     return output;
 }
 
+Material DoMaterial(int index, float4 color0, float4 color1)
+{
+    Material stateMat = state.Materials[index];
+
+    Material runtimeMat;
+    if (state.Modes.ColorVertex)
+    {
+        const int SRC_MATERIAL = 0;
+        const int SRC_COLOR1 = 1;
+        const int SRC_COLOR2 = 2;
+
+        // FIXME "If either AMBIENTMATERIALSOURCE option is used, and the vertex color is not provided, then the material ambient color is used."
+        if (state.Modes.AmbientMaterialSource == SRC_MATERIAL)
+            runtimeMat.Ambient = stateMat.Ambient;
+        else if (state.Modes.AmbientMaterialSource == SRC_COLOR1)
+            runtimeMat.Ambient = color0;
+        else
+            runtimeMat.Ambient = color1;
+
+        if (state.Modes.AmbientMaterialSource == SRC_MATERIAL)
+            runtimeMat.Diffuse = stateMat.Diffuse;
+        else if (state.Modes.DiffuseMaterialSource == SRC_COLOR1)
+            runtimeMat.Diffuse = color0;
+        else
+            runtimeMat.Diffuse = color1;
+
+        if (state.Modes.SpecularMaterialSource == SRC_MATERIAL)
+            runtimeMat.Specular = stateMat.Specular;
+        else if (state.Modes.SpecularMaterialSource == SRC_COLOR1)
+            runtimeMat.Specular = color0;
+        else
+            runtimeMat.Specular = color1;
+
+        if (state.Modes.EmissiveMaterialSource == SRC_MATERIAL)
+            runtimeMat.Emissive = stateMat.Emissive;
+        else if (state.Modes.EmissiveMaterialSource == SRC_COLOR1)
+            runtimeMat.Emissive = color0;
+        else
+            runtimeMat.Emissive = color1;
+    }
+    else
+    {
+        runtimeMat.Ambient = stateMat.Ambient;
+        runtimeMat.Diffuse = stateMat.Diffuse;
+        runtimeMat.Specular = stateMat.Specular;
+        runtimeMat.Emissive = stateMat.Emissive;
+    }
+
+    return runtimeMat;
+}
+
 VS_OUTPUT main(const VS_INPUT xIn)
 {
 	VS_OUTPUT xOut;
@@ -214,6 +265,12 @@ VS_OUTPUT main(const VS_INPUT xIn)
     {
         float3 worldNormal = normalize(world.Normal);
         lighting = CalcLighting(worldNormal, worldPos.xyz, cameraPos.xyz);
+
+        if (!state.Modes.TwoSidedLighting)
+        {
+            lighting.BackDiffuse = float4(1, 1, 1, 1);
+            lighting.BackSpecular = float4(0, 0, 0, 1);
+        }
     }
     else
     {
@@ -223,62 +280,27 @@ VS_OUTPUT main(const VS_INPUT xIn)
     }
 
     // Colours
-    Material material;
-    if (state.Modes.ColorVertex)
-    {
-        const int SRC_MATERIAL = 0;
-        const int SRC_COLOR1 = 1;
-        const int SRC_COLOR2 = 2;
+    Material material = DoMaterial(0, xIn.color[0], xIn.color[1]);
+    Material backMaterial = DoMaterial(1, xIn.color[0], xIn.color[1]);
 
-        // FIXME "If either AMBIENTMATERIALSOURCE option is used, and the vertex color is not provided, then the material ambient color is used."
-        if(state.Modes.AmbientMaterialSource == SRC_MATERIAL)
-            material.Ambient = state.Material.Ambient;
-        else if(state.Modes.AmbientMaterialSource == SRC_COLOR1)
-            material.Ambient = xIn.color[0];
-        else
-            material.Ambient = xIn.color[1];
-
-        if (state.Modes.AmbientMaterialSource == SRC_MATERIAL)
-            material.Diffuse = state.Material.Diffuse;
-        else if (state.Modes.DiffuseMaterialSource == SRC_COLOR1)
-            material.Diffuse = xIn.color[0];
-        else
-            material.Diffuse = xIn.color[1];
-
-        if (state.Modes.SpecularMaterialSource == SRC_MATERIAL)
-            material.Specular = state.Material.Specular;
-        else if (state.Modes.SpecularMaterialSource == SRC_COLOR1)
-            material.Specular = xIn.color[0];
-        else
-            material.Specular = xIn.color[1];
-
-        if (state.Modes.EmissiveMaterialSource == SRC_MATERIAL)
-            material.Emissive = state.Material.Emissive;
-        else if (state.Modes.EmissiveMaterialSource == SRC_COLOR1)
-            material.Emissive = xIn.color[0];
-        else
-            material.Emissive = xIn.color[1];
-    }
-    else
-    {
-        material.Ambient = state.Material.Ambient;
-        material.Diffuse = state.Material.Diffuse;
-        material.Specular = state.Material.Specular;
-        material.Emissive = state.Material.Emissive;
-    }
-
-    // TODO implement material backface diffuse & specular
+    // Final lighting
     float4 ambient = material.Ambient * (state.Modes.Ambient + lighting.Ambient);
+    float4 backAmbient = backMaterial.Ambient * (state.Modes.BackAmbient + lighting.Ambient);
+    
     float4 diffuse = material.Diffuse * lighting.Diffuse;
-    float4 backDiffuse = float4(1, 1, 1, 1) * lighting.BackDiffuse;
+    float4 backDiffuse = backMaterial.Diffuse * lighting.BackDiffuse;
+    
     float4 specular = material.Specular * lighting.Specular;
-    float4 backSpecular = float4(0, 0, 0, 0) * lighting.BackSpecular;
+    float4 backSpecular = backMaterial.Specular * lighting.BackSpecular;
+    
     float4 emissive = material.Emissive;
+    float4 backEmissive = backMaterial.Emissive;
 
+    // Frontface
     xOut.oD0 = saturate(ambient + diffuse + emissive);
     xOut.oD1 = saturate(specular);
-    // TODO backface colours
-    xOut.oB0 = saturate(ambient + backDiffuse + emissive);
+    // Backface
+    xOut.oB0 = saturate(backAmbient + backDiffuse + backEmissive);
     xOut.oB1 = saturate(backSpecular);
 
     // TODO fog and fog state
