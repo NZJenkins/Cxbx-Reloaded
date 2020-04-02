@@ -63,11 +63,12 @@ struct Material {
     float4 Specular;
     float4 Emissive;
 
-    float Power;
+    alignas(16) float Power;
 };
 
 struct Modes {
     float4 Ambient;
+    float4 BackAmbient;
 
     // Can't be packed due to use in flow control
     alignas(16) float AmbientMaterialSource;
@@ -75,7 +76,13 @@ struct Modes {
     alignas(16) float SpecularMaterialSource;
     alignas(16) float EmissiveMaterialSource;
 
+    alignas(16) float BackAmbientMaterialSource;
+    alignas(16) float BackDiffuseMaterialSource;
+    alignas(16) float BackSpecularMaterialSource;
+    alignas(16) float BackEmissiveMaterialSource;
+
     alignas(16) float Lighting;
+    alignas(16) float TwoSidedLighting;
     alignas(16) float ColorVertex;
     alignas(16) float VertexBlend;
 };
@@ -83,7 +90,7 @@ struct Modes {
 struct RenderStateBlock {
     alignas(16) Transforms Transforms;
     alignas(16) arr(Lights, Light, 8);
-    alignas(16) Material Material;
+    alignas(16) arr(Materials, Material, 2);
     alignas(16) Modes Modes;
 };
 

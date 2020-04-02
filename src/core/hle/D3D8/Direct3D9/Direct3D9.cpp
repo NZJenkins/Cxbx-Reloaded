@@ -7191,15 +7191,25 @@ void CxbxUpdateNativeD3DResources()
 		g_pD3DDevice->SetVertexShaderConstantF(0, (float*)&g_vshConstants, X_D3DVS_CONSTREG_COUNT);
 	}
 	else {
+		// Lighting
 		g_renderStateBlock.Modes.Lighting = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_LIGHTING);
-		g_renderStateBlock.Modes.Ambient = toVector(XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_AMBIENT));
-
+		g_renderStateBlock.Modes.TwoSidedLighting = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_TWOSIDEDLIGHTING);
 		g_renderStateBlock.Modes.ColorVertex = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_COLORVERTEX);
+
+		g_renderStateBlock.Modes.Ambient = toVector(XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_AMBIENT));
+		g_renderStateBlock.Modes.BackAmbient = toVector(XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_BACKAMBIENT));
+
+		// Material sources
 		g_renderStateBlock.Modes.AmbientMaterialSource = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_AMBIENTMATERIALSOURCE);
 		g_renderStateBlock.Modes.DiffuseMaterialSource = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_DIFFUSEMATERIALSOURCE);
 		g_renderStateBlock.Modes.SpecularMaterialSource = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_SPECULARMATERIALSOURCE);
 		g_renderStateBlock.Modes.EmissiveMaterialSource = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_EMISSIVEMATERIALSOURCE);
+		g_renderStateBlock.Modes.BackAmbientMaterialSource = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_BACKAMBIENTMATERIALSOURCE);
+		g_renderStateBlock.Modes.BackDiffuseMaterialSource = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_BACKDIFFUSEMATERIALSOURCE);
+		g_renderStateBlock.Modes.BackSpecularMaterialSource = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_BACKSPECULARMATERIALSOURCE);
+		g_renderStateBlock.Modes.BackEmissiveMaterialSource = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_BACKEMISSIVEMATERIALSOURCE);
 
+		// Vertex blending
 		g_renderStateBlock.Modes.VertexBlend = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_VERTEXBLEND);
 
 		for (int i = 0; i < g_renderStateBlock.Lights.size(); i++) {
@@ -7907,11 +7917,11 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_SetMaterial)
 {
 	LOG_FUNC_ONE_ARG(pMaterial);
 
-	g_renderStateBlock.Material.Ambient = toVector(pMaterial->Ambient);
-	g_renderStateBlock.Material.Diffuse = toVector(pMaterial->Diffuse);
-	g_renderStateBlock.Material.Specular = toVector(pMaterial->Specular);
-	g_renderStateBlock.Material.Emissive = toVector(pMaterial->Emissive);
-	g_renderStateBlock.Material.Power = pMaterial->Power;
+	g_renderStateBlock.Materials[0].Ambient = toVector(pMaterial->Ambient);
+	g_renderStateBlock.Materials[0].Diffuse = toVector(pMaterial->Diffuse);
+	g_renderStateBlock.Materials[0].Specular = toVector(pMaterial->Specular);
+	g_renderStateBlock.Materials[0].Emissive = toVector(pMaterial->Emissive);
+	g_renderStateBlock.Materials[0].Power = pMaterial->Power;
 
     HRESULT hRet = g_pD3DDevice->SetMaterial(pMaterial);
 	DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetMaterial");
