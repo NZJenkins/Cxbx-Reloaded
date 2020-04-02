@@ -248,6 +248,46 @@ Material DoMaterial(int index, float4 color0, float4 color1)
     return runtimeMat;
 }
 
+float DoFog(float4 cameraPos)
+{
+    const int D3DFOG_NONE = 0;
+    const int D3DFOG_EXP = 1;
+    const int D3DFOG_EXP2 = 2;
+    const int D3DFOG_LINEAR = 3;
+
+    // Early exit if fog is disabled
+    //if (!state.Fog.Enable || state.Fog.TableMode == D3DFOG_NONE)
+    //    return 0;
+
+    // We're doing some fog
+    float depth = state.Fog.RangeFogEnable ? length(cameraPos.xyz) : abs(cameraPos.z);
+
+    // We just need to output the depth in oFog (?)
+    
+    return depth;
+
+    /*
+    float density = state.Fog.Density;
+    float fogStart = state.Fog.Start;
+    float fogEnd = state.Fog.End;
+
+    if (state.Fog.TableMode == D3DFOG_EXP)
+    {
+        return 1 / exp(density * depth);
+    }
+    else if (state.Fog.TableMode == D3DFOG_EXP2)
+    {
+        return 1 / exp(pow(density * depth, 2));
+    }
+    else if (state.Fog.TableMode == D3DFOG_LINEAR)
+    {
+        return saturate((fogEnd - depth) / (fogEnd - fogStart));
+    }
+
+    return 0;
+*/
+}
+
 VS_OUTPUT main(const VS_INPUT xIn)
 {
 	VS_OUTPUT xOut;
@@ -303,8 +343,8 @@ VS_OUTPUT main(const VS_INPUT xIn)
     xOut.oB0 = saturate(backAmbient + backDiffuse + backEmissive);
     xOut.oB1 = saturate(backSpecular);
 
-    // TODO fog and fog state
-	xOut.oFog = 0;
+    float fog = DoFog(cameraPos);
+    xOut.oFog = fog;
 
     // TODO point stuff
 	xOut.oPts = 0;

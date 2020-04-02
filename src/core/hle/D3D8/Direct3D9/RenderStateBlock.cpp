@@ -25,7 +25,7 @@
 // Taking care with packing rules
 // In VS_3_0, packing works in mysterious ways
 // * Structs inside arrays are not packed
-// * Values used in flow control are not packed(?)
+// * Floats can't be packed at all (?)
 // We don't get documented packing until vs_4_0
 
 #pragma pack_matrix(row_major)
@@ -70,7 +70,6 @@ struct Modes {
     float4 Ambient;
     float4 BackAmbient;
 
-    // Can't be packed due to use in flow control
     alignas(16) float AmbientMaterialSource;
     alignas(16) float DiffuseMaterialSource;
     alignas(16) float SpecularMaterialSource;
@@ -87,11 +86,21 @@ struct Modes {
     alignas(16) float VertexBlend;
 };
 
+struct Fog {
+    alignas(16) float Enable;
+    alignas(16) float RangeFogEnable;
+    alignas(16) float TableMode;
+    alignas(16) float Start;
+    alignas(16) float End;
+    alignas(16) float Density;
+};
+
 struct RenderStateBlock {
     alignas(16) Transforms Transforms;
     alignas(16) arr(Lights, Light, 8);
     alignas(16) arr(Materials, Material, 2);
     alignas(16) Modes Modes;
+    alignas(16) Fog Fog;
 };
 
 #undef float4x4
