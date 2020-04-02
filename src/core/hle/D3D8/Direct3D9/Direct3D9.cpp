@@ -7166,6 +7166,11 @@ D3DXVECTOR4 toVector(D3DCOLOR color) {
 
 void UpdateLightState(int);
 
+float AsFloat(uint32_t value) {
+	auto v = value;
+	return *(float*)&v;
+}
+
 void CxbxUpdateNativeD3DResources()
 {
 	// Before we start, make sure our resource cache stays limited in size
@@ -7208,6 +7213,14 @@ void CxbxUpdateNativeD3DResources()
 		g_renderStateBlock.Modes.BackDiffuseMaterialSource = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_BACKDIFFUSEMATERIALSOURCE);
 		g_renderStateBlock.Modes.BackSpecularMaterialSource = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_BACKSPECULARMATERIALSOURCE);
 		g_renderStateBlock.Modes.BackEmissiveMaterialSource = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_BACKEMISSIVEMATERIALSOURCE);
+
+		// Fog
+		g_renderStateBlock.Fog.Enable = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_FOGENABLE);
+		g_renderStateBlock.Fog.TableMode = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_FOGTABLEMODE);
+		g_renderStateBlock.Fog.Start = AsFloat(XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_FOGSTART));
+		g_renderStateBlock.Fog.End = AsFloat(XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_FOGEND));
+		g_renderStateBlock.Fog.Density = AsFloat(XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_FOGDENSITY));
+		g_renderStateBlock.Fog.RangeFogEnable = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_RANGEFOGENABLE);
 
 		// Vertex blending
 		g_renderStateBlock.Modes.VertexBlend = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_VERTEXBLEND);
