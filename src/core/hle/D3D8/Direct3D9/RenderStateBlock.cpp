@@ -86,6 +86,10 @@ struct Modes {
     alignas(16) float VertexBlend;
 };
 
+struct TextureState {
+    alignas(16) float TextureTransformFlags;
+};
+
 struct Fog {
     alignas(16) float Enable;
     alignas(16) float RangeFogEnable;
@@ -101,6 +105,7 @@ struct RenderStateBlock {
     alignas(16) arr(Materials, Material, 2);
     alignas(16) Modes Modes;
     alignas(16) Fog Fog;
+    alignas(16) arr(TextureStates, TextureState, 4);
 };
 
 #undef float4x4
