@@ -7232,6 +7232,11 @@ void CxbxUpdateNativeD3DResources()
 		g_renderStateBlock.Fog.Density = AsFloat(XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_FOGDENSITY));
 		g_renderStateBlock.Fog.RangeFogEnable = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_RANGEFOGENABLE);
 
+		// Texture things...
+		for (int i = 0; i < 4; i++) {
+			g_renderStateBlock.TextureStates[i].TextureTransformFlags = XboxTextureStates.Get(i, XTL::X_D3DTSS_TEXTURETRANSFORMFLAGS);
+		}
+
 		// Vertex blending
 		g_renderStateBlock.Modes.VertexBlend = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_VERTEXBLEND);
 
