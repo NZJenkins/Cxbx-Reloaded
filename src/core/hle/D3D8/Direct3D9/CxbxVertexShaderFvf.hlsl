@@ -288,9 +288,11 @@ float DoFog(float4 cameraPos)
 */
 }
 
-float4 DoTexCoord(int stage, float4 texCoord)
+float4 DoTexCoord(int stage, float4 texCoords[4])
 {
     int flags = state.TextureStates[stage].TextureTransformFlags;
+    int texCoordIndex = state.TextureStates[stage].TexCoordIndex;
+    float4 texCoord = texCoords[texCoordIndex];
     if(flags == 0)
         return texCoord;
     else
@@ -361,10 +363,10 @@ VS_OUTPUT main(const VS_INPUT xIn)
     // xOut.oD0 = float4(world.Normal, 1);
 
 	// TODO reverse scaling for linear textures
-    xOut.oT0 = DoTexCoord(0, xIn.texcoord[0]);
-    xOut.oT1 = DoTexCoord(1, xIn.texcoord[1]);
-    xOut.oT2 = DoTexCoord(2, xIn.texcoord[2]);
-    xOut.oT3 = DoTexCoord(3, xIn.texcoord[3]);
+    xOut.oT0 = DoTexCoord(0, xIn.texcoord);
+    xOut.oT1 = DoTexCoord(1, xIn.texcoord);
+    xOut.oT2 = DoTexCoord(2, xIn.texcoord);
+    xOut.oT3 = DoTexCoord(3, xIn.texcoord);
 
 	return xOut;
 }

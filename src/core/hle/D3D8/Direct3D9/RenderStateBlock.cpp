@@ -88,6 +88,8 @@ struct Modes {
 
 struct TextureState {
     alignas(16) float TextureTransformFlags;
+    alignas(16) float TexCoordIndex;
+    alignas(16) float TexCoordIndexGen;
 };
 
 struct Fog {
