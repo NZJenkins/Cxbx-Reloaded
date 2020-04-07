@@ -68,8 +68,8 @@ LightingOutput DoPointLight(Light l, float3 worldNormal, float3 worldPos)
         + l.Attenuation1 * lightDist
         + l.Attenuation2 * lightDist * lightDist);
 
-    float NdotL = dot(worldNormal, normalize(toLight));
-    float lightDiffuse = abs(NdotL * attenuation) * l.Diffuse;;
+    float NdotL = dot(worldNormal, normalize(toLight)); // should we normalize?
+    float4 lightDiffuse = abs(NdotL * attenuation) * l.Diffuse;;
 
     if (NdotL >= 0.f)
         o.Diffuse = lightDiffuse;
@@ -89,8 +89,8 @@ LightingOutput DoDirectionalLight(Light l, float3 worldNormal)
     o.Specular = o.BackSpecular = float4(0, 0, 0, 0);
 
     // Intensity from N . L
-    float NdotL = dot(worldNormal, -normalize(l.Direction));
-    float lightDiffuse = abs(NdotL * l.Diffuse.rgb);
+    float NdotL = dot(worldNormal, -normalize(l.Direction)); // should we normalize?
+    float4 lightDiffuse = abs(NdotL * l.Diffuse);
 
     // Apply light contribution to front or back face
     // as the case may be
