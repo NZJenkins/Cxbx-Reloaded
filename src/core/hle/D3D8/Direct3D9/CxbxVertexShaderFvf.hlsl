@@ -51,9 +51,43 @@ struct LightingOutput
     float4 BackSpecular;
 };
 
+struct SpecularResult
+{
+    float4 Specular;
+    float4 BackSpecular;
+};
+
+SpecularResult DoSpecular(float3 toLight, float3 worldNormal, float3 toViewer, float2 powers, float4 lightSpecular)
+{
+    SpecularResult o;
+    o.Specular = float4(0, 0, 0, 0);
+    o.BackSpecular = float4(0, 0, 0, 0);
+    
+    // Specular
+    if (state.Modes.SpecularEnable)
+    {
+        // Blinn-Phong
+        float3 toViewer = float3(0, 0, 1);
+
+        toLight = normalize(toLight);
+        float3 halfway = normalize(toViewer + toLight);
+        float NdotH = dot(worldNormal, halfway);
+
+        float4 frontSpecular = pow(abs(NdotH), powers[0]) * lightSpecular;
+        float4 backSpecular = pow(abs(NdotH), powers[1]) * lightSpecular;
+        
+        if (NdotH >= 0)
+            o.Specular += frontSpecular;
+        else
+            o.BackSpecular += backSpecular;
+    }
+
+    return o;
+}
+
 // useful reference https://drivers.amd.com/misc/samples/dx9/FixedFuncShader.pdf
 
-LightingOutput DoPointLight(Light l, float3 worldNormal, float3 worldPos)
+LightingOutput DoPointLight(Light l, float3 worldNormal, float3 worldPos, float3 toViewer, float2 powers)
 {
     LightingOutput o;
     o.Ambient = l.Ambient;
@@ -76,20 +110,25 @@ LightingOutput DoPointLight(Light l, float3 worldNormal, float3 worldPos)
     else
         o.BackDiffuse = lightDiffuse;
 
-    // TODO specular
+    SpecularResult sr = DoSpecular(toLight, worldNormal, toViewer, powers, l.Specular);
+    o.Specular = sr.Specular;
+    o.BackSpecular = sr.BackSpecular;
 
     return o;
 }
 
-LightingOutput DoDirectionalLight(Light l, float3 worldNormal)
+LightingOutput DoDirectionalLight(Light l, float3 worldNormal, float3 toViewer, float2 powers)
 {
     LightingOutput o;
     o.Ambient = l.Ambient;
     o.Diffuse = o.BackDiffuse = float4(0, 0, 0, 0);
     o.Specular = o.BackSpecular = float4(0, 0, 0, 0);
 
+    // Diffuse
+
     // Intensity from N . L
-    float NdotL = dot(worldNormal, -normalize(l.Direction)); // should we normalize?
+    float3 toLight = -normalize(l.Direction); // should we normalize?
+    float NdotL = dot(worldNormal, toLight);
     float4 lightDiffuse = abs(NdotL * l.Diffuse);
 
     // Apply light contribution to front or back face
@@ -99,13 +138,16 @@ LightingOutput DoDirectionalLight(Light l, float3 worldNormal)
     else
         o.BackDiffuse += lightDiffuse;
 
-    // TODO specular
+    // Specular
+    SpecularResult sr = DoSpecular(toLight, worldNormal, toViewer, powers, l.Specular);
+    o.Specular = sr.Specular;
+    o.BackSpecular = sr.BackSpecular;
 
     return o;
 }
 
 
-LightingOutput CalcLighting(float3 worldNormal, float3 worldPos, float3 cameraPos)
+LightingOutput CalcLighting(float3 worldNormal, float3 worldPos, float3 cameraPos, float2 powers)
 {
     const int LIGHT_TYPE_NONE        = 0;
     const int LIGHT_TYPE_POINT       = 1;
@@ -118,6 +160,10 @@ LightingOutput CalcLighting(float3 worldNormal, float3 worldPos, float3 cameraPo
     totalLightOutput.BackDiffuse = float4(0, 0, 0, 1);
     totalLightOutput.Specular = float4(0, 0, 0, 1);
     totalLightOutput.BackSpecular = float4(0, 0, 0, 1);
+
+    float3 toViewer = float3(0, 0, 1);
+    if (state.Modes.LocalViewer)
+        toViewer = normalize(cameraPos - worldPos);
     
     
     for (uint i = 0; i < 8; i++)
@@ -126,11 +172,11 @@ LightingOutput CalcLighting(float3 worldNormal, float3 worldPos, float3 cameraPo
         LightingOutput currentLightOutput;
 
         if(currentLight.Type == LIGHT_TYPE_POINT)
-            currentLightOutput = DoPointLight(currentLight, worldNormal, worldPos);
+            currentLightOutput = DoPointLight(currentLight, worldNormal, worldPos, toViewer, powers);
         else if(currentLight.Type == LIGHT_TYPE_SPOT)
             continue;
         else if (currentLight.Type == LIGHT_TYPE_DIRECTIONAL)
-            currentLightOutput = DoDirectionalLight(currentLight, worldNormal);
+            currentLightOutput = DoDirectionalLight(currentLight, worldNormal, toViewer, powers);
         else
             continue;
 
@@ -245,6 +291,8 @@ Material DoMaterial(int index, float4 color0, float4 color1)
         runtimeMat.Emissive = stateMat.Emissive;
     }
 
+    runtimeMat.Power = stateMat.Power;
+
     return runtimeMat;
 }
 
@@ -310,12 +358,18 @@ VS_OUTPUT main(const VS_INPUT xIn)
     float4 cameraPos = mul(worldPos, state.Transforms.View);
     xOut.oPos = mul(cameraPos, state.Transforms.Projection);
 
+    // Materials
+    Material material = DoMaterial(0, xIn.color[0], xIn.color[1]);
+    Material backMaterial = DoMaterial(1, xIn.color[0], xIn.color[1]);
+    
     // Vertex lighting
     LightingOutput lighting;
     if (state.Modes.Lighting)
     {
         float3 worldNormal = normalize(world.Normal);
-        lighting = CalcLighting(worldNormal, worldPos.xyz, cameraPos.xyz);
+        float2 powers = float2(material.Power, backMaterial.Power);
+
+        lighting = CalcLighting(worldNormal, worldPos.xyz, cameraPos.xyz, powers);
 
         if (!state.Modes.TwoSidedLighting)
         {
@@ -329,10 +383,6 @@ VS_OUTPUT main(const VS_INPUT xIn)
         lighting.Diffuse = lighting.BackDiffuse = float4(1, 1, 1, 1);
         lighting.Specular = lighting.BackSpecular = float4(0, 0, 0, 1);
     }
-
-    // Colours
-    Material material = DoMaterial(0, xIn.color[0], xIn.color[1]);
-    Material backMaterial = DoMaterial(1, xIn.color[0], xIn.color[1]);
 
     // Final lighting
     float4 ambient = material.Ambient * (state.Modes.Ambient + lighting.Ambient);

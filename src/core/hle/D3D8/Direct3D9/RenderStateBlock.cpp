@@ -82,6 +82,8 @@ struct Modes {
 
     alignas(16) float Lighting;
     alignas(16) float TwoSidedLighting;
+    alignas(16) float SpecularEnable;
+    alignas(16) float LocalViewer;
     alignas(16) float ColorVertex;
     alignas(16) float VertexBlend;
 };

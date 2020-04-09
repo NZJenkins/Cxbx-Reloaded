@@ -7209,6 +7209,8 @@ void CxbxUpdateNativeD3DResources()
 		// Lighting
 		g_renderStateBlock.Modes.Lighting = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_LIGHTING);
 		g_renderStateBlock.Modes.TwoSidedLighting = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_TWOSIDEDLIGHTING);
+		g_renderStateBlock.Modes.SpecularEnable = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_SPECULARENABLE);
+		g_renderStateBlock.Modes.LocalViewer = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_LOCALVIEWER);
 		g_renderStateBlock.Modes.ColorVertex = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_COLORVERTEX);
 
 		g_renderStateBlock.Modes.Ambient = toVector(XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_AMBIENT));
