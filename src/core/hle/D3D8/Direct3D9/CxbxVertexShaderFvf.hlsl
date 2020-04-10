@@ -42,31 +42,32 @@ struct VS_OUTPUT
 	float4 oT3  : TEXCOORD3; // Texture coordinate set 3
 };
 
+// Vertex lighting
+// Both frontface and backface lighting can be calculated
+struct LightingInfo
+{
+    float4 Front;
+    float4 Back;
+};
+
+// Final lighting output
 struct LightingOutput
 {
     float4 Ambient;
-    float4 Diffuse;
-    float4 Specular;
-    float4 BackDiffuse;
-    float4 BackSpecular;
+    LightingInfo Diffuse;
+    LightingInfo Specular;
 };
 
-struct SpecularResult
+LightingInfo DoSpecular(float3 toLight, float3 worldNormal, float3 toViewer, float2 powers, float4 lightSpecular)
 {
-    float4 Specular;
-    float4 BackSpecular;
-};
-
-SpecularResult DoSpecular(float3 toLight, float3 worldNormal, float3 toViewer, float2 powers, float4 lightSpecular)
-{
-    SpecularResult o;
-    o.Specular = float4(0, 0, 0, 0);
-    o.BackSpecular = float4(0, 0, 0, 0);
+    LightingInfo o;
+    o.Front = o.Back = float4(0, 0, 0, 0);
     
     // Specular
     if (state.Modes.SpecularEnable)
     {
         // Blinn-Phong
+        // https://learnopengl.com/Advanced-Lighting/Advanced-Lighting
         float3 toViewer = float3(0, 0, 1);
 
         toLight = normalize(toLight);
@@ -77,9 +78,9 @@ SpecularResult DoSpecular(float3 toLight, float3 worldNormal, float3 toViewer, f
         float4 backSpecular = pow(abs(NdotH), powers[1]) * lightSpecular;
         
         if (NdotH >= 0)
-            o.Specular += frontSpecular;
+            o.Front = frontSpecular;
         else
-            o.BackSpecular += backSpecular;
+            o.Back = backSpecular;
     }
 
     return o;
@@ -91,9 +92,10 @@ LightingOutput DoPointLight(Light l, float3 worldNormal, float3 worldPos, float3
 {
     LightingOutput o;
     o.Ambient = l.Ambient;
-    o.Diffuse = o.BackDiffuse = float4(0, 0, 0, 0);
-    o.Specular = o.BackSpecular= float4(0, 0, 0, 0);
-    
+    o.Diffuse.Front = o.Diffuse.Back = float4(0, 0, 0, 0);
+    o.Specular.Front = o.Specular.Back = float4(0, 0, 0, 0);
+
+    // Diffuse
     float3 toLight = worldPos - l.Position;
     float lightDist = length(toLight);
     // A(Constant) + A(Linear) * dist + A(Exp) * dist^2
@@ -106,13 +108,12 @@ LightingOutput DoPointLight(Light l, float3 worldNormal, float3 worldPos, float3
     float4 lightDiffuse = abs(NdotL * attenuation) * l.Diffuse;;
 
     if (NdotL >= 0.f)
-        o.Diffuse = lightDiffuse;
+        o.Diffuse.Front = lightDiffuse;
     else
-        o.BackDiffuse = lightDiffuse;
+        o.Diffuse.Back = lightDiffuse;
 
-    SpecularResult sr = DoSpecular(toLight, worldNormal, toViewer, powers, l.Specular);
-    o.Specular = sr.Specular;
-    o.BackSpecular = sr.BackSpecular;
+    // Specular
+    o.Specular = DoSpecular(toLight, worldNormal, toViewer, powers, l.Specular);
 
     return o;
 }
@@ -121,8 +122,8 @@ LightingOutput DoDirectionalLight(Light l, float3 worldNormal, float3 toViewer, 
 {
     LightingOutput o;
     o.Ambient = l.Ambient;
-    o.Diffuse = o.BackDiffuse = float4(0, 0, 0, 0);
-    o.Specular = o.BackSpecular = float4(0, 0, 0, 0);
+    o.Diffuse.Front = o.Diffuse.Back = float4(0, 0, 0, 0);
+    o.Specular.Front = o.Specular.Back = float4(0, 0, 0, 0);
 
     // Diffuse
 
@@ -134,14 +135,12 @@ LightingOutput DoDirectionalLight(Light l, float3 worldNormal, float3 toViewer, 
     // Apply light contribution to front or back face
     // as the case may be
     if (NdotL >= 0)
-        o.Diffuse += lightDiffuse;
+        o.Diffuse.Front = lightDiffuse;
     else
-        o.BackDiffuse += lightDiffuse;
+        o.Diffuse.Back = lightDiffuse;
 
     // Specular
-    SpecularResult sr = DoSpecular(toLight, worldNormal, toViewer, powers, l.Specular);
-    o.Specular = sr.Specular;
-    o.BackSpecular = sr.BackSpecular;
+    o.Specular = DoSpecular(toLight, worldNormal, toViewer, powers, l.Specular);
 
     return o;
 }
@@ -156,10 +155,10 @@ LightingOutput CalcLighting(float3 worldNormal, float3 worldPos, float3 cameraPo
 
     LightingOutput totalLightOutput;
     totalLightOutput.Ambient = float4(0, 0, 0, 1);
-    totalLightOutput.Diffuse = float4(0, 0, 0, 1);
-    totalLightOutput.BackDiffuse = float4(0, 0, 0, 1);
-    totalLightOutput.Specular = float4(0, 0, 0, 1);
-    totalLightOutput.BackSpecular = float4(0, 0, 0, 1);
+    totalLightOutput.Diffuse.Front = float4(0, 0, 0, 1);
+    totalLightOutput.Diffuse.Back = float4(0, 0, 0, 1);
+    totalLightOutput.Specular.Front = float4(0, 0, 0, 1);
+    totalLightOutput.Specular.Back = float4(0, 0, 0, 1);
 
     float3 toViewer = float3(0, 0, 1);
     if (state.Modes.LocalViewer)
@@ -181,10 +180,10 @@ LightingOutput CalcLighting(float3 worldNormal, float3 worldPos, float3 cameraPo
             continue;
 
         totalLightOutput.Ambient += currentLightOutput.Ambient;
-        totalLightOutput.Diffuse += currentLightOutput.Diffuse;
-        totalLightOutput.BackDiffuse += currentLightOutput.BackDiffuse;
-        totalLightOutput.Specular += currentLightOutput.Specular;
-        totalLightOutput.BackSpecular += currentLightOutput.BackSpecular;
+        totalLightOutput.Diffuse.Front += currentLightOutput.Diffuse.Front;
+        totalLightOutput.Diffuse.Back += currentLightOutput.Diffuse.Back;
+        totalLightOutput.Specular.Front += currentLightOutput.Specular.Front;
+        totalLightOutput.Specular.Back += currentLightOutput.Specular.Back;
     }
 
     return totalLightOutput;
@@ -373,26 +372,26 @@ VS_OUTPUT main(const VS_INPUT xIn)
 
         if (!state.Modes.TwoSidedLighting)
         {
-            lighting.BackDiffuse = float4(1, 1, 1, 1);
-            lighting.BackSpecular = float4(0, 0, 0, 1);
+            lighting.Diffuse.Back = float4(1, 1, 1, 1);
+            lighting.Specular.Back = float4(0, 0, 0, 1);
         }
     }
     else
     {
         lighting.Ambient = float4(0, 0, 0, 1);
-        lighting.Diffuse = lighting.BackDiffuse = float4(1, 1, 1, 1);
-        lighting.Specular = lighting.BackSpecular = float4(0, 0, 0, 1);
+        lighting.Diffuse.Front = lighting.Diffuse.Front = float4(1, 1, 1, 1);
+        lighting.Specular.Back = lighting.Specular.Front = float4(0, 0, 0, 1);
     }
 
     // Final lighting
     float4 ambient = material.Ambient * (state.Modes.Ambient + lighting.Ambient);
     float4 backAmbient = backMaterial.Ambient * (state.Modes.BackAmbient + lighting.Ambient);
     
-    float4 diffuse = material.Diffuse * lighting.Diffuse;
-    float4 backDiffuse = backMaterial.Diffuse * lighting.BackDiffuse;
+    float4 diffuse = material.Diffuse * lighting.Diffuse.Front;
+    float4 backDiffuse = backMaterial.Diffuse * lighting.Diffuse.Back;
     
-    float4 specular = material.Specular * lighting.Specular;
-    float4 backSpecular = backMaterial.Specular * lighting.BackSpecular;
+    float4 specular = material.Specular * lighting.Specular.Front;
+    float4 backSpecular = backMaterial.Specular * lighting.Specular.Back;
     
     float4 emissive = material.Emissive;
     float4 backEmissive = backMaterial.Emissive;
