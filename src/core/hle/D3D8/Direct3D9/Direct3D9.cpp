@@ -7240,8 +7240,7 @@ void CxbxUpdateNativeD3DResources()
 
 			auto texCoordIndex = XboxTextureStates.Get(i, XTL::X_D3DTSS_TEXCOORDINDEX);
 			g_renderStateBlock.TextureStates[i].TexCoordIndex = texCoordIndex & 0x7; // 8 coords
-			// TODO texgen
-			g_renderStateBlock.TextureStates[i].TexCoordIndexGen = texCoordIndex & ~0x7; // ?
+			g_renderStateBlock.TextureStates[i].TexCoordIndexGen = texCoordIndex >> 16; // D3DTSS_TCI flags
 		}
 
 		// Vertex blending

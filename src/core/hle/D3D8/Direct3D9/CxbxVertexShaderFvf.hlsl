@@ -335,15 +335,83 @@ float DoFog(float4 cameraPos)
 */
 }
 
-float4 DoTexCoord(int stage, float4 texCoords[4])
+float4 DoTexCoord(int stage, float4 texCoords[4], float3 cameraNormal, float4 cameraPos)
 {
-    int flags = state.TextureStates[stage].TextureTransformFlags;
-    int texCoordIndex = state.TextureStates[stage].TexCoordIndex;
-    float4 texCoord = texCoords[texCoordIndex];
-    if(flags == 0)
-        return texCoord;
+    // Texture transform flags
+    // https://docs.microsoft.com/en-gb/windows/win32/direct3d9/d3dtexturetransformflags
+    const int D3DTTFF_DISABLE = 0;
+    const int D3DTTFF_COUNT1  = 1;
+    const int D3DTTFF_COUNT2  = 2;
+    const int D3DTTFF_COUNT3  = 3;
+    const int D3DTTFF_COUNT4  = 4;
+    const int D3DTTFF_PROJECTED = 256; // This is the only real flag
+
+    // https://docs.microsoft.com/en-us/windows/win32/direct3d9/d3dtss-tci
+    // Pre-shifted
+    const int TCI_PASSTHRU = 0;
+    const int TCI_CAMERASPACENORMAL = 1;
+    const int TCI_CAMERASPACEPOSITION = 2;
+    const int TCI_CAMERASPACEREFLECTIONVECTOR = 3;
+    const int TCI_OBJECT = 4; // Xbox
+    const int TCI_SPHERE = 5; // Xbox
+
+    const TextureState tState = state.TextureStates[stage];
+    
+    // Extract transform flags
+    int countFlag = fmod(tState.TextureTransformFlags, 8);
+    bool projected = tState.TextureTransformFlags > D3DTTFF_PROJECTED;
+
+    // Something in this function is wrong
+    // Test case: JSRF graffiti bottle pickups
+
+    // Get texture coordinates
+    // Coordinates are either from the vertex texcoord data
+    // Or generated
+    float4 texCoord = float4(0, 0, 0, 0);
+    if (tState.TexCoordIndexGen == TCI_PASSTHRU)
+    {
+        // Get from vertex data
+        int texCoordIndex = tState.TexCoordIndex;
+        texCoord = texCoords[texCoordIndex];
+    }
     else
-        return mul(texCoord, state.Transforms.Texture[stage]);
+    {   
+        // Generate texture coordinates
+        float3 reflected = reflect(normalize(cameraPos.xyz), cameraNormal);
+        
+        if (tState.TexCoordIndexGen == TCI_CAMERASPACENORMAL)
+            texCoord.xyz = cameraNormal;
+        else if (tState.TexCoordIndexGen == TCI_CAMERASPACEPOSITION)
+            texCoord = cameraPos;
+        else if (tState.TexCoordIndexGen == TCI_CAMERASPACEREFLECTIONVECTOR)
+            texCoord.xyz = reflected;
+        // else if TCI_OBJECT TODO is this just model position?
+        else if (tState.TexCoordIndexGen == TCI_SPHERE)
+        {
+            // TODO verify
+            // http://www.bluevoid.com/opengl/sig99/advanced99/notes/node177.html
+            float3 R = reflected;
+            float p = sqrt(pow(R.x, 2) + pow(R.y, 2) + pow(R.z + 1, 2));
+            texCoord.x = R.x / 2 * p + 0.5;
+            texCoord.y = R.y / 2 * p + 0.5;
+        }
+    }
+
+    // Determine if we need to transform the texture coordinates
+    if (countFlag == D3DTTFF_DISABLE)
+        return texCoord; // No transforms, just return it
+
+    // Transform the coordinates
+    float4 transformedCoords = mul(texCoord, state.Transforms.Texture[stage]);
+    
+    if (projected)
+    {
+        // Projected coordinates are divided by the last coordinate index
+        int lastCoordIndex = countFlag - 1;
+        transformedCoords /= transformedCoords[lastCoordIndex];
+    }
+
+    return transformedCoords;
 }
 
 VS_OUTPUT main(const VS_INPUT xIn)
@@ -357,6 +425,9 @@ VS_OUTPUT main(const VS_INPUT xIn)
     float4 cameraPos = mul(worldPos, state.Transforms.View);
     xOut.oPos = mul(cameraPos, state.Transforms.Projection);
 
+    float3 worldNormal = normalize(world.Normal);
+    float3 cameraNormal = mul(worldNormal, (float3x3) state.Transforms.View);
+
     // Materials
     Material material = DoMaterial(0, xIn.color[0], xIn.color[1]);
     Material backMaterial = DoMaterial(1, xIn.color[0], xIn.color[1]);
@@ -365,7 +436,6 @@ VS_OUTPUT main(const VS_INPUT xIn)
     LightingOutput lighting;
     if (state.Modes.Lighting)
     {
-        float3 worldNormal = normalize(world.Normal);
         float2 powers = float2(material.Power, backMaterial.Power);
 
         lighting = CalcLighting(worldNormal, worldPos.xyz, cameraPos.xyz, powers);
@@ -412,10 +482,10 @@ VS_OUTPUT main(const VS_INPUT xIn)
     // xOut.oD0 = float4(world.Normal, 1);
 
 	// TODO reverse scaling for linear textures
-    xOut.oT0 = DoTexCoord(0, xIn.texcoord);
-    xOut.oT1 = DoTexCoord(1, xIn.texcoord);
-    xOut.oT2 = DoTexCoord(2, xIn.texcoord);
-    xOut.oT3 = DoTexCoord(3, xIn.texcoord);
+    xOut.oT0 = DoTexCoord(0, xIn.texcoord, cameraNormal, cameraPos);
+    xOut.oT1 = DoTexCoord(1, xIn.texcoord, cameraNormal, cameraPos);
+    xOut.oT2 = DoTexCoord(2, xIn.texcoord, cameraNormal, cameraPos);
+    xOut.oT3 = DoTexCoord(3, xIn.texcoord, cameraNormal, cameraPos);
 
 	return xOut;
 }
