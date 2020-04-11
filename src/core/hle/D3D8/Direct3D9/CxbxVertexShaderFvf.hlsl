@@ -58,7 +58,7 @@ struct LightingOutput
     LightingInfo Specular;
 };
 
-LightingInfo DoSpecular(float3 toLight, float3 worldNormal, float3 toViewer, float2 powers, float4 lightSpecular)
+LightingInfo DoSpecular(float3 toLightWorld, float3 vNormWorld, float3 toViewerView, float2 powers, float4 lightSpecular)
 {
     LightingInfo o;
     o.Front = o.Back = float4(0, 0, 0, 0);
@@ -68,11 +68,10 @@ LightingInfo DoSpecular(float3 toLight, float3 worldNormal, float3 toViewer, flo
     {
         // Blinn-Phong
         // https://learnopengl.com/Advanced-Lighting/Advanced-Lighting
-        float3 toViewer = float3(0, 0, 1);
-
-        toLight = normalize(toLight);
-        float3 halfway = normalize(toViewer + toLight);
-        float NdotH = dot(worldNormal, halfway);
+        // TODO do everytihng in same coordinate space so it might actually work
+        toLightWorld = normalize(toLightWorld);
+        float3 halfway = normalize(toViewerView + toLightWorld);
+        float NdotH = dot(vNormWorld, halfway);
 
         float4 frontSpecular = pow(abs(NdotH), powers[0]) * lightSpecular;
         float4 backSpecular = pow(abs(NdotH), powers[1]) * lightSpecular;
@@ -88,7 +87,7 @@ LightingInfo DoSpecular(float3 toLight, float3 worldNormal, float3 toViewer, flo
 
 // useful reference https://drivers.amd.com/misc/samples/dx9/FixedFuncShader.pdf
 
-LightingOutput DoPointLight(Light l, float3 worldNormal, float3 worldPos, float3 toViewer, float2 powers)
+LightingOutput DoPointLight(Light l, float3 vNormWorld, float3 vPosWorld, float3 toViewerView, float2 powers)
 {
     LightingOutput o;
     o.Ambient = l.Ambient;
@@ -96,15 +95,15 @@ LightingOutput DoPointLight(Light l, float3 worldNormal, float3 worldPos, float3
     o.Specular.Front = o.Specular.Back = float4(0, 0, 0, 0);
 
     // Diffuse
-    float3 toLight = worldPos - l.Position;
-    float lightDist = length(toLight);
+    float3 toLightWorld = vPosWorld - l.Position;
+    float lightDist = length(toLightWorld);
     // A(Constant) + A(Linear) * dist + A(Exp) * dist^2
     float attenuation =
         1 / (l.Attenuation0
         + l.Attenuation1 * lightDist
         + l.Attenuation2 * lightDist * lightDist);
 
-    float NdotL = dot(worldNormal, normalize(toLight)); // should we normalize?
+    float NdotL = dot(vNormWorld, normalize(toLightWorld)); // should we normalize?
     float4 lightDiffuse = abs(NdotL * attenuation) * l.Diffuse;;
 
     if (NdotL >= 0.f)
@@ -113,12 +112,12 @@ LightingOutput DoPointLight(Light l, float3 worldNormal, float3 worldPos, float3
         o.Diffuse.Back = lightDiffuse;
 
     // Specular
-    o.Specular = DoSpecular(toLight, worldNormal, toViewer, powers, l.Specular);
+    o.Specular = DoSpecular(toLightWorld, vNormWorld, toViewerView, powers, l.Specular);
 
     return o;
 }
 
-LightingOutput DoDirectionalLight(Light l, float3 worldNormal, float3 toViewer, float2 powers)
+LightingOutput DoDirectionalLight(Light l, float3 vNormWorld, float3 toViewerView, float2 powers)
 {
     LightingOutput o;
     o.Ambient = l.Ambient;
@@ -128,8 +127,8 @@ LightingOutput DoDirectionalLight(Light l, float3 worldNormal, float3 toViewer, 
     // Diffuse
 
     // Intensity from N . L
-    float3 toLight = -normalize(l.Direction); // should we normalize?
-    float NdotL = dot(worldNormal, toLight);
+    float3 toLightWorld = -normalize(l.Direction); // should we normalize?
+    float NdotL = dot(vNormWorld, toLightWorld);
     float4 lightDiffuse = abs(NdotL * l.Diffuse);
 
     // Apply light contribution to front or back face
@@ -140,13 +139,13 @@ LightingOutput DoDirectionalLight(Light l, float3 worldNormal, float3 toViewer, 
         o.Diffuse.Back = lightDiffuse;
 
     // Specular
-    o.Specular = DoSpecular(toLight, worldNormal, toViewer, powers, l.Specular);
+    o.Specular = DoSpecular(toLightWorld, vNormWorld, toViewerView, powers, l.Specular);
 
     return o;
 }
 
 
-LightingOutput CalcLighting(float3 worldNormal, float3 worldPos, float3 cameraPos, float2 powers)
+LightingOutput CalcLighting(float3 vNormWorld, float3 vPosWorld, float3 vPosView, float2 powers)
 {
     const int LIGHT_TYPE_NONE        = 0;
     const int LIGHT_TYPE_POINT       = 1;
@@ -160,9 +159,9 @@ LightingOutput CalcLighting(float3 worldNormal, float3 worldPos, float3 cameraPo
     totalLightOutput.Specular.Front = float4(0, 0, 0, 1);
     totalLightOutput.Specular.Back = float4(0, 0, 0, 1);
 
-    float3 toViewer = float3(0, 0, 1);
+    float3 toViewerView = float3(0, 0, 1);
     if (state.Modes.LocalViewer)
-        toViewer = normalize(cameraPos - worldPos);
+        toViewerView = normalize(-vPosView);
     
     
     for (uint i = 0; i < 8; i++)
@@ -171,11 +170,11 @@ LightingOutput CalcLighting(float3 worldNormal, float3 worldPos, float3 cameraPo
         LightingOutput currentLightOutput;
 
         if(currentLight.Type == LIGHT_TYPE_POINT)
-            currentLightOutput = DoPointLight(currentLight, worldNormal, worldPos, toViewer, powers);
+            currentLightOutput = DoPointLight(currentLight, vNormWorld, vPosWorld, toViewerView, powers);
         else if(currentLight.Type == LIGHT_TYPE_SPOT)
             continue;
         else if (currentLight.Type == LIGHT_TYPE_DIRECTIONAL)
-            currentLightOutput = DoDirectionalLight(currentLight, worldNormal, toViewer, powers);
+            currentLightOutput = DoDirectionalLight(currentLight, vNormWorld, toViewerView, powers);
         else
             continue;
 
@@ -295,7 +294,7 @@ Material DoMaterial(int index, float4 color0, float4 color1)
     return runtimeMat;
 }
 
-float DoFog(float4 cameraPos)
+float DoFog(float4 vPosView)
 {
     const int D3DFOG_NONE = 0;
     const int D3DFOG_EXP = 1;
@@ -307,7 +306,7 @@ float DoFog(float4 cameraPos)
     //    return 0;
 
     // We're doing some fog
-    float depth = state.Fog.RangeFogEnable ? length(cameraPos.xyz) : abs(cameraPos.z);
+    float depth = state.Fog.RangeFogEnable ? length(vPosView.xyz) : abs(vPosView.z);
 
     // We just need to output the depth in oFog (?)
     
@@ -335,7 +334,7 @@ float DoFog(float4 cameraPos)
 */
 }
 
-float4 DoTexCoord(int stage, float4 texCoords[4], float3 cameraNormal, float4 cameraPos)
+float4 DoTexCoord(int stage, float4 texCoords[4], float3 vNormView, float4 vPosView)
 {
     // Texture transform flags
     // https://docs.microsoft.com/en-gb/windows/win32/direct3d9/d3dtexturetransformflags
@@ -377,12 +376,12 @@ float4 DoTexCoord(int stage, float4 texCoords[4], float3 cameraNormal, float4 ca
     else
     {   
         // Generate texture coordinates
-        float3 reflected = reflect(normalize(cameraPos.xyz), cameraNormal);
+        float3 reflected = reflect(normalize(vPosView.xyz), vNormView);
         
         if (tState.TexCoordIndexGen == TCI_CAMERASPACENORMAL)
-            texCoord.xyz = cameraNormal;
+            texCoord.xyz = vNormView;
         else if (tState.TexCoordIndexGen == TCI_CAMERASPACEPOSITION)
-            texCoord = cameraPos;
+            texCoord = vPosView;
         else if (tState.TexCoordIndexGen == TCI_CAMERASPACEREFLECTIONVECTOR)
             texCoord.xyz = reflected;
         // else if TCI_OBJECT TODO is this just model position?
@@ -421,12 +420,14 @@ VS_OUTPUT main(const VS_INPUT xIn)
     // World transform with vertex blending
     WorldTransformOutput world = DoWorldTransform(xIn.pos, xIn.normal.xyz, xIn.bw);
 
-    float4 worldPos = world.Position;
-    float4 cameraPos = mul(worldPos, state.Transforms.View);
-    xOut.oPos = mul(cameraPos, state.Transforms.Projection);
+    float4 vPosWorld = world.Position;
+    float4 vPosView = mul(vPosWorld, state.Transforms.View);
+    xOut.oPos = mul(vPosView, state.Transforms.Projection);
 
-    float3 worldNormal = normalize(world.Normal);
-    float3 cameraNormal = mul(worldNormal, (float3x3) state.Transforms.View);
+    float3 vNormWorld = normalize(world.Normal);
+    float3 vNormView = mul(vNormWorld, (float3x3) state.Transforms.View);
+
+    float3 cameraPosWorld = -state.Transforms.View[3].xyz;
 
     // Materials
     Material material = DoMaterial(0, xIn.color[0], xIn.color[1]);
@@ -438,7 +439,7 @@ VS_OUTPUT main(const VS_INPUT xIn)
     {
         float2 powers = float2(material.Power, backMaterial.Power);
 
-        lighting = CalcLighting(worldNormal, worldPos.xyz, cameraPos.xyz, powers);
+        lighting = CalcLighting(vNormWorld, vPosWorld.xyz, vPosView.xyz, powers);
 
         if (!state.Modes.TwoSidedLighting)
         {
@@ -475,7 +476,7 @@ VS_OUTPUT main(const VS_INPUT xIn)
     xOut.oB0 = saturate(backAmbient + backDiffuse + backEmissive);
     xOut.oB1 = saturate(backSpecular);
 
-    float fog = DoFog(cameraPos);
+    float fog = DoFog(vPosView);
     xOut.oFog = fog;
 
     // TODO point stuff
@@ -484,10 +485,10 @@ VS_OUTPUT main(const VS_INPUT xIn)
     // xOut.oD0 = float4(world.Normal, 1);
 
 	// TODO reverse scaling for linear textures
-    xOut.oT0 = DoTexCoord(0, xIn.texcoord, cameraNormal, cameraPos);
-    xOut.oT1 = DoTexCoord(1, xIn.texcoord, cameraNormal, cameraPos);
-    xOut.oT2 = DoTexCoord(2, xIn.texcoord, cameraNormal, cameraPos);
-    xOut.oT3 = DoTexCoord(3, xIn.texcoord, cameraNormal, cameraPos);
+    xOut.oT0 = DoTexCoord(0, xIn.texcoord, vNormView, vPosView);
+    xOut.oT1 = DoTexCoord(1, xIn.texcoord, vNormView, vPosView);
+    xOut.oT2 = DoTexCoord(2, xIn.texcoord, vNormView, vPosView);
+    xOut.oT3 = DoTexCoord(3, xIn.texcoord, vNormView, vPosView);
 
 	return xOut;
 }
