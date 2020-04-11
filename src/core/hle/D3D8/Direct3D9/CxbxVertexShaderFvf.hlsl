@@ -449,8 +449,8 @@ VS_OUTPUT main(const VS_INPUT xIn)
     else
     {
         lighting.Ambient = float4(0, 0, 0, 0);
-        lighting.Diffuse.Front = lighting.Diffuse.Front = float4(1, 1, 1, 1);
-        lighting.Specular.Back = lighting.Specular.Front = float4(0, 0, 0, 0);
+        lighting.Diffuse.Front = lighting.Diffuse.Back = float4(1, 1, 1, 1);
+        lighting.Specular.Front = lighting.Specular.Back = float4(0, 0, 0, 0);
     }
 
     // Final lighting
