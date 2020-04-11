@@ -28,7 +28,6 @@
 // * Floats can't be packed at all (?)
 // We don't get documented packing until vs_4_0
 
-#pragma pack_matrix(row_major)
 struct Transforms {
     float4x4 View; // 0
     float4x4 Projection; // 1
