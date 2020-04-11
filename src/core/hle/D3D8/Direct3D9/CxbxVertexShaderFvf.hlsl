@@ -358,7 +358,7 @@ float4 DoTexCoord(int stage, float4 texCoords[4], float3 cameraNormal, float4 ca
     const TextureState tState = state.TextureStates[stage];
     
     // Extract transform flags
-    int countFlag = fmod(tState.TextureTransformFlags, 8);
+    int countFlag = fmod(tState.TextureTransformFlags, D3DTTFF_PROJECTED);
     bool projected = tState.TextureTransformFlags > D3DTTFF_PROJECTED;
 
     // Something in this function is wrong
