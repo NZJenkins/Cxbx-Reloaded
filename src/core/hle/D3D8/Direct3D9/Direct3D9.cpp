@@ -6564,7 +6564,11 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_SetTransform)
     }
     */
 
-	((D3DMATRIX*)&g_renderStateBlock.Transforms)[State] = *pMatrix;
+	// Transpose row major to column major for HLSL
+	D3DXMATRIX hlslMatrix;
+	D3DXMatrixTranspose(&hlslMatrix, (D3DXMATRIX*)pMatrix);
+	// Save to vertex shader state
+	((D3DXMATRIX*)&g_renderStateBlock.Transforms)[State] = hlslMatrix;
 
     State = EmuXB2PC_D3DTS(State);
 
