@@ -448,9 +448,9 @@ VS_OUTPUT main(const VS_INPUT xIn)
     }
     else
     {
-        lighting.Ambient = float4(0, 0, 0, 1);
+        lighting.Ambient = float4(0, 0, 0, 0);
         lighting.Diffuse.Front = lighting.Diffuse.Front = float4(1, 1, 1, 1);
-        lighting.Specular.Back = lighting.Specular.Front = float4(0, 0, 0, 1);
+        lighting.Specular.Back = lighting.Specular.Front = float4(0, 0, 0, 0);
     }
 
     // Final lighting
@@ -468,7 +468,9 @@ VS_OUTPUT main(const VS_INPUT xIn)
 
     // Frontface
     xOut.oD0 = saturate(ambient + diffuse + emissive);
+    xOut.oD0.a = material.Diffuse.a;
     xOut.oD1 = saturate(specular);
+    xOut.oD1.a = backMaterial.Diffuse.a;
     // Backface
     xOut.oB0 = saturate(backAmbient + backDiffuse + backEmissive);
     xOut.oB1 = saturate(backSpecular);
