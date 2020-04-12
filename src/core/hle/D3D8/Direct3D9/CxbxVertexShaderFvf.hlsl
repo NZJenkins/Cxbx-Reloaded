@@ -202,6 +202,8 @@ struct WorldTransformOutput
 WorldTransformOutput DoWorldTransform(float4 position, float3 normal, float4 blendWeights)
 {
     WorldTransformOutput output;
+    output.Position = float4(0, 0, 0, 0);
+    output.Normal = float3(0, 0, 0);
 
     // D3D
     const int _BLEND_OFF = 0;
