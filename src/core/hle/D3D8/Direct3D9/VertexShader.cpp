@@ -69,7 +69,7 @@ void ParameterHlsl(std::stringstream& hlsl, VSH_IMD_PARAMETER& param, bool Index
 		"?", // PARAM_UNKNOWN = 0,
 		"r", // PARAM_R,          // Temporary (scRatch) registers
 		"v", // PARAM_V,          // Vertex registers
-		"c", // PARAM_C,          // Constant registers, set by SetVertexShaderConstant
+		"c", // PARAM_C,          // Constant registers, set by SetXboxVertexShaderConstant
 		"oPos" // PARAM_O // = 0??
 	};
 

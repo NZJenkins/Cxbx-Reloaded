@@ -72,7 +72,7 @@ typedef struct _CxbxVertexShaderInfo
 {
 	UINT                       NumberOfVertexStreams; // The number of streams the vertex shader uses
 	CxbxVertexShaderStreamInfo VertexStreams[X_VSH_MAX_STREAMS];
-	bool vRegisterInDeclaration[16];
+	bool vRegisterInDeclaration[X_VSH_MAX_ATTRIBUTES];
 }
 CxbxVertexShaderInfo;
 
@@ -188,7 +188,7 @@ enum VSH_PARAMETER_TYPE {
 	PARAM_UNKNOWN = 0,
 	PARAM_R,          // Temporary (scRatch) registers
 	PARAM_V,          // Vertex registers
-	PARAM_C,          // Constant registers, set by SetVertexShaderConstant
+	PARAM_C,          // Constant registers, set by SetXboxVertexShaderConstant
 	PARAM_O // = 0??
 };
 

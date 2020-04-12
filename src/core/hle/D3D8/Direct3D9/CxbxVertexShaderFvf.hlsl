@@ -3,14 +3,14 @@
 // todo rename Fvf => FixedFunc
 
 // Default values for vertex registers, and whether to use them
-uniform float4 vRegisterDefaultValues[16] : register(c192);
-uniform float4 vRegisterDefaultFlagsPacked[4] : register(c208);
+uniform float4 vRegisterDefaultValues[16] : register(c192); // Matches CXBX_D3DVS_CONSTVREG_DEFAULT_VALUE_BASE
+uniform float4 vRegisterDefaultFlagsPacked[4] : register(c208); // Matches CXBX_D3DVS_CONSTVREG_DEFAULT_FLAGS_BASE
 
-uniform RenderStateBlock state : register(c0); // : register(c214);
+uniform RenderStateBlock state : register(c0); // TODO : register(c214); // Matches CXBX_D3DVS_FIXEDFUNCSTATE_BASE
 
 
 // TODO just use texcoord for everything
-// Output registers
+// Input registers
 struct VS_INPUT
 {
 	// Position
@@ -29,7 +29,6 @@ struct VS_INPUT
     float4 backColor[2] : TEXCOORD4;
     float4 normal : NORMAL;
     float4 texcoord[4] : TEXCOORD;
-	
 };
 
 // Output registers
@@ -168,7 +167,6 @@ LightingOutput CalcLighting(float3 vNormWorld, float3 vPosWorld, float3 vPosView
     float3 toViewerView = float3(0, 0, 1);
     if (state.Modes.LocalViewer)
         toViewerView = normalize(-vPosView);
-    
     
     for (uint i = 0; i < 8; i++)
     {
@@ -429,8 +427,24 @@ VS_OUTPUT main(VS_INPUT xIn)
 
     // TODO map all default values to registers
     // Map default color values
+	//if (vRegisterDefaultFlags[0]) xIn.pos = vRegisterDefaultValues[0];
+	//if (vRegisterDefaultFlags[1]) xIn.bw = vRegisterDefaultValues[1]; // TODO : Is index 1 correct?
+	//if (vRegisterDefaultFlags[2]) xIn.? = vRegisterDefaultValues[2];
     if (vRegisterDefaultFlags[3]) xIn.color[0] = vRegisterDefaultValues[3];
     if (vRegisterDefaultFlags[4]) xIn.color[1] = vRegisterDefaultValues[4];
+	// TODO : Are below indexed correctly?
+	if (vRegisterDefaultFlags[5]) xIn.backColor[0] = vRegisterDefaultValues[5];
+	if (vRegisterDefaultFlags[6]) xIn.backColor[1] = vRegisterDefaultValues[6];
+	if (vRegisterDefaultFlags[7]) xIn.normal = vRegisterDefaultValues[7];
+	if (vRegisterDefaultFlags[8]) xIn.texcoord[0] = vRegisterDefaultValues[8];
+	if (vRegisterDefaultFlags[9]) xIn.texcoord[1] = vRegisterDefaultValues[9];
+	if (vRegisterDefaultFlags[10]) xIn.texcoord[2] = vRegisterDefaultValues[10];
+	// TODO : Avoid "error X4505: maximum temp register index exceeded" when enabling any more below
+	//if (vRegisterDefaultFlags[11]) xIn.texcoord[3] = vRegisterDefaultValues[11];
+	// if (vRegisterDefaultFlags[12]) xIn.? = vRegisterDefaultValues[12];
+	// if (vRegisterDefaultFlags[13]) xIn.? = vRegisterDefaultValues[13];
+	// if (vRegisterDefaultFlags[14]) xIn.? = vRegisterDefaultValues[14];
+	// if (vRegisterDefaultFlags[15]) xIn.? = vRegisterDefaultValues[15];
 
     // World transform with vertex blending
     WorldTransformOutput world = DoWorldTransform(xIn.pos, xIn.normal.xyz, xIn.bw);
