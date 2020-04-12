@@ -364,8 +364,8 @@ float4 DoTexCoord(int stage, float4 texCoords[4], float3 vNormView, float4 vPosV
     const TextureState tState = state.TextureStates[stage];
     
     // Extract transform flags
-    int countFlag = fmod(tState.TextureTransformFlags, D3DTTFF_PROJECTED);
-    bool projected = tState.TextureTransformFlags > D3DTTFF_PROJECTED;
+    int countFlag = tState.TextureTransformFlagsCount;
+    bool projected = tState.TextureTransformFlagsProjected;
 
     // Get texture coordinates
     // Coordinates are either from the vertex texcoord data

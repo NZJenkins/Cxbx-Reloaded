@@ -7240,7 +7240,9 @@ void CxbxUpdateNativeD3DResources()
 
 		// Texture things...
 		for (int i = 0; i < 4; i++) {
-			g_renderStateBlock.TextureStates[i].TextureTransformFlags = XboxTextureStates.Get(i, XTL::X_D3DTSS_TEXTURETRANSFORMFLAGS);
+			auto transformFlags = XboxTextureStates.Get(i, XTL::X_D3DTSS_TEXTURETRANSFORMFLAGS);
+			g_renderStateBlock.TextureStates[i].TextureTransformFlagsCount = transformFlags & ~D3DTTFF_PROJECTED;
+			g_renderStateBlock.TextureStates[i].TextureTransformFlagsProjected = transformFlags & D3DTTFF_PROJECTED;
 
 			auto texCoordIndex = XboxTextureStates.Get(i, XTL::X_D3DTSS_TEXCOORDINDEX);
 			g_renderStateBlock.TextureStates[i].TexCoordIndex = texCoordIndex & 0x7; // 8 coords
