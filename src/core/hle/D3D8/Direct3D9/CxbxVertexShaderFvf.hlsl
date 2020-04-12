@@ -6,7 +6,7 @@
 uniform float4 vRegisterDefaultValues[16] : register(c192);
 uniform float4 vRegisterDefaultFlagsPacked[4] : register(c208);
 
-RenderStateBlock state : register(c214);
+uniform RenderStateBlock state : register(c0); // : register(c214);
 
 
 // TODO just use texcoord for everything

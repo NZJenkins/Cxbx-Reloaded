@@ -7259,7 +7259,7 @@ void CxbxUpdateNativeD3DResources()
 		int slots = ceil(sizeof(RenderStateBlock) / (float)(4 * sizeof(float)));
 
 		auto hRet = g_pD3DDevice->SetVertexShaderConstantF(
-			CXBX_D3DVS_FIXEDFUNCSTATE,
+			0, // CXBX_D3DVS_FIXEDFUNCSTATE,
 			(float*)&g_renderStateBlock,
 			slots);
 	}
