@@ -2,7 +2,12 @@
 
 // todo rename Fvf => FixedFunc
 
-RenderStateBlock state; // : register(c214);
+// Default values for vertex registers, and whether to use them
+uniform float4 vRegisterDefaultValues[16] : register(c192);
+uniform float4 vRegisterDefaultFlagsPacked[4] : register(c208);
+
+RenderStateBlock state : register(c214);
+
 
 // TODO just use texcoord for everything
 // Output registers
@@ -252,7 +257,9 @@ Material DoMaterial(int index, float4 color0, float4 color1)
         const int SRC_COLOR1 = 1;
         const int SRC_COLOR2 = 2;
 
-        // FIXME "If either AMBIENTMATERIALSOURCE option is used, and the vertex color is not provided, then the material ambient color is used."
+        // TODO verify correct behaviour when COLORVERTEX is true but no vertex colours are provided
+        // Do we use the material value like D3D9? Or the default colour value (which you can set on Xbox)
+        // In D3D9 "If either AMBIENTMATERIALSOURCE option is used, and the vertex color is not provided, then the material ambient color is used."
         if (state.Modes.AmbientMaterialSource == SRC_MATERIAL)
             runtimeMat.Ambient = stateMat.Ambient;
         else if (state.Modes.AmbientMaterialSource == SRC_COLOR1)
@@ -413,9 +420,17 @@ float4 DoTexCoord(int stage, float4 texCoords[4], float3 vNormView, float4 vPosV
     return transformedCoords;
 }
 
-VS_OUTPUT main(const VS_INPUT xIn)
+VS_OUTPUT main(VS_INPUT xIn)
 {
 	VS_OUTPUT xOut;
+
+	// Unpack 16 flags from 4 float4 constant registers
+    float vRegisterDefaultFlags[16] = (float[16]) vRegisterDefaultFlagsPacked;
+
+    // TODO map all default values to registers
+    // Map default color values
+    if (vRegisterDefaultFlags[3]) xIn.color[0] = vRegisterDefaultValues[3];
+    if (vRegisterDefaultFlags[4]) xIn.color[1] = vRegisterDefaultValues[4];
 
     // World transform with vertex blending
     WorldTransformOutput world = DoWorldTransform(xIn.pos, xIn.normal.xyz, xIn.bw);
