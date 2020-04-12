@@ -989,9 +989,9 @@ IDirect3DResource *GetHostResource(XTL::X_D3DResource *pXboxResource, DWORD D3DU
 
 extern NV2ADevice* g_NV2A;
 
-std::array<std::array<float, 4>, 192> g_vshConstants = { 0 };
+std::array<std::array<float, 4>, X_D3DVS_CONSTREG_COUNT> g_vshConstants = { 0 };
 
-void SetVertexShaderConstant(int index, const float* value) {
+void SetXboxVertexShaderConstant(int index, const float* value) {
 	g_vshConstants[index][0] = value[0];
 	g_vshConstants[index][1] = value[1];
 	g_vshConstants[index][2] = value[2];
@@ -1055,11 +1055,11 @@ void SetCxbxVertexShader(CxbxVertexShader* pCxbxVertexShader) {
 		// Titles can specify default values for registers via calls like SetVertexData4f
 		// HLSL shaders need to know whether to use vertex data or default vertex shader values
 		// Any register not in the vertex declaration should be set to the default value
-		float vertexDefaultFlags[16];
-		for (int i = 0; i < 16; i++) {
+		float vertexDefaultFlags[X_VSH_MAX_ATTRIBUTES];
+		for (int i = 0; i < X_VSH_MAX_ATTRIBUTES; i++) {
 			vertexDefaultFlags[i] = pCxbxVertexShader->VertexShaderInfo.vRegisterInDeclaration[i] ? 0.0f : 1.0f;
 		}
-		g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_CONSTREG_VREGDEFAULTS_FLAG_BASE, vertexDefaultFlags, 4);
+		g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_CONSTVREG_DEFAULT_FLAGS_BASE, vertexDefaultFlags, CXBX_D3DVS_CONSTVREG_DEFAULT_FLAGS_SIZE);
 	}
 }
 
@@ -2632,7 +2632,7 @@ static DWORD WINAPI EmuCreateDeviceProxy(LPVOID)
                 );
 				DEBUG_D3DRESULT(hRet, "g_pD3DDevice->CreateVertexBuffer");
 
-                for(int Streams = 0; Streams < 16; Streams++)
+                for(int Streams = 0; Streams < X_VSH_MAX_STREAMS; Streams++)
                 {
                     hRet = g_pD3DDevice->SetStreamSource(Streams, g_pDummyBuffer,
 						0, // OffsetInBytes
@@ -4079,20 +4079,18 @@ void UpdateViewPortOffsetAndScaleConstants()
     GetViewPortOffsetAndScale(vOffset, vScale);
 
 	// FIXME
-	//CopyVertexConstantToNv2a(CXBX_D3DVS_VIEWPORT_SCALE_MIRROR, vScale);
-	//CopyVertexConstantToNv2a(CXBX_D3DVS_VIEWPORT_OFFSET_MIRROR, vOffset);
-	g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_VIEWPORT_SCALE_MIRROR, vScale, 1);
-    g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_VIEWPORT_OFFSET_MIRROR, vOffset, 1);
+	//CopyVertexConstantToNv2a(CXBX_D3DVS_VIEWPORT_MIRROR_SCALE_BASE, vScale);
+	//CopyVertexConstantToNv2a(CXBX_D3DVS_VIEWPORT_MIRROR_OFFSET_BASE, vOffset);
+	g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_VIEWPORT_MIRROR_SCALE_BASE, vScale, CXBX_D3DVS_VIEWPORT_MIRROR_SCALE_SIZE);
+    g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_VIEWPORT_MIRROR_OFFSET_BASE, vOffset, CXBX_D3DVS_VIEWPORT_MIRROR_OFFSET_SIZE);
 
 	// Store viewport offset and scale in constant registers 58 (c-38) and
 	// 59 (c-37) used for screen space transformation.
 	// We only do this if X_D3DSCM_NORESERVEDCONSTANTS is not set, since enabling this flag frees up these registers for shader used
 	if (g_Xbox_VertexShaderConstantMode != X_D3DSCM_NORESERVEDCONSTANTS)
 	{
-		// g_pD3DDevice->SetVertexShaderConstantF(X_D3DSCM_RESERVED_CONSTANT_SCALE + X_D3DSCM_CORRECTION, vScale, 1);
-		// g_pD3DDevice->SetVertexShaderConstantF(X_D3DSCM_RESERVED_CONSTANT_OFFSET + X_D3DSCM_CORRECTION, vOffset, 1);
-		SetVertexShaderConstant(X_D3DSCM_RESERVED_CONSTANT_SCALE + X_D3DSCM_CORRECTION, vScale);
-		SetVertexShaderConstant(X_D3DSCM_RESERVED_CONSTANT_OFFSET + X_D3DSCM_CORRECTION, vOffset);
+		SetXboxVertexShaderConstant(X_D3DSCM_RESERVED_CONSTANT_SCALE + X_D3DSCM_CORRECTION, vScale);
+		SetXboxVertexShaderConstant(X_D3DSCM_RESERVED_CONSTANT_OFFSET + X_D3DSCM_CORRECTION, vOffset);
 	}
 }
 
@@ -4394,23 +4392,12 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_SetVertexShaderConstant)
 	Register += X_D3DSCM_CORRECTION;
 
 	if (Register < 0) LOG_TEST_CASE("Register < 0");
+	else
 	if (Register + ConstantCount > X_D3DVS_CONSTREG_COUNT) LOG_TEST_CASE("Register + ConstantCount > X_D3DVS_CONSTREG_COUNT");
-    HRESULT hRet;
-	//hRet = g_pD3DDevice->SetVertexShaderConstantF(
-	//	Register,
-	//	(float*)pConstantData,
-	//	ConstantCount
-	//);
+	else
 	for (int i = 0; i < ConstantCount; i++) {
-		SetVertexShaderConstant(Register + i, (float*)pConstantData + i * 4);
+		SetXboxVertexShaderConstant(Register + i, (float*)pConstantData + i * 4);
 	}
-	DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetVertexShaderConstant");
-
-    if(FAILED(hRet))
-    {
-        EmuLog(LOG_LEVEL::WARNING, "We're lying about setting a vertex shader constant!");
-        hRet = D3D_OK;
-    }   
 }
 
 // ******************************************************************
@@ -4737,11 +4724,14 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_SetVertexData4f)
 		// If we have an active vertex shader, we also write the input to a vertex shader constant
 		// This allows us to implement Xbox functionality where SetVertexData4f can be used to specify attributes
 		// not present in the vertex declaration.
-		// We use range 193 and up to store these values, as Xbox shaders stop at c192!
+		// We use range 192 and up to store these values, as Xbox vertex shader constants stop at c191!
+		// (See CXBX_D3DVS_CONSTVREG_DEFAULT_VALUE_BASE)
 		FLOAT values[] = {a,b,c,d};
 		if (Register < 0) LOG_TEST_CASE("Register < 0");
-		if (Register >= 16) LOG_TEST_CASE("Register >= 16");
-		g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_CONSTREG_VREGDEFAULTS_BASE + Register, values, 1);
+		else
+		if (Register >= X_VSH_MAX_ATTRIBUTES) LOG_TEST_CASE("Register >= 16");
+		else
+		g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_CONSTVREG_DEFAULT_VALUE_BASE + Register, values, 1);
 	}
 
 	// Grow g_InlineVertexBuffer_Table to contain at least current, and a potentially next vertex
@@ -7203,11 +7193,11 @@ void CxbxUpdateNativeD3DResources()
 			}
 
 			if (nv2a->pgraph.vsh_constants_dirty[i]) {
-				SetVertexShaderConstant(i, (float*)&nv2a->pgraph.vsh_constants[i][0]);
+				SetXboxVertexShaderConstant(i, (float*)&nv2a->pgraph.vsh_constants[i][0]);
 				nv2a->pgraph.vsh_constants_dirty[i] = false;
 			}
 		}
-		g_pD3DDevice->SetVertexShaderConstantF(0, (float*)&g_vshConstants, X_D3DVS_CONSTREG_COUNT);
+		g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_CONSTREG_XBOX_BASE, (float*)&g_vshConstants, CXBX_D3DVS_CONSTREG_XBOX_SIZE);
 	}
 	else {
 		// Lighting
@@ -7256,12 +7246,9 @@ void CxbxUpdateNativeD3DResources()
 			UpdateLightState(i);
 		}
 
-		int slots = ceil(sizeof(RenderStateBlock) / (float)(4 * sizeof(float)));
+		const int CXBX_D3DVS_FIXEDFUNCSTATE_SIZE = (sizeof(RenderStateBlock) + CXBX_D3DVS_SLOT_SIZE_IN_BYTES - 1) / CXBX_D3DVS_SLOT_SIZE_IN_BYTES;
 
-		auto hRet = g_pD3DDevice->SetVertexShaderConstantF(
-			0, // CXBX_D3DVS_FIXEDFUNCSTATE,
-			(float*)&g_renderStateBlock,
-			slots);
+		auto hRet = g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_FIXEDFUNCSTATE_BASE, (float*)&g_renderStateBlock, CXBX_D3DVS_FIXEDFUNCSTATE_SIZE);
 	}
 
     // NOTE: Order is important here
