@@ -26,6 +26,7 @@ struct VS_INPUT
     float4 pos : POSITION;
     float4 bw : BLENDWEIGHT;
     float4 color[2] : COLOR;
+    float4 backColor[2] : TEXCOORD4;
     float4 normal : NORMAL;
     float4 texcoord[4] : TEXCOORD;
 	
@@ -444,21 +445,15 @@ VS_OUTPUT main(VS_INPUT xIn)
     float3 cameraPosWorld = -state.Transforms.View[3].xyz;
 
     // Vertex lighting
-    if (state.Modes.Lighting)
+    if (state.Modes.Lighting || state.Modes.TwoSidedLighting)
     {
         // Materials
         Material material = DoMaterial(0, xIn.color[0], xIn.color[1]);
-        Material backMaterial = DoMaterial(1, xIn.color[0], xIn.color[1]);
+        Material backMaterial = DoMaterial(1, xIn.backColor[0], xIn.backColor[1]);
         
         float2 powers = float2(material.Power, backMaterial.Power);
 
         LightingOutput lighting = CalcLighting(vNormWorld, vPosWorld.xyz, vPosView.xyz, powers);
-
-        if (!state.Modes.TwoSidedLighting)
-        {
-            lighting.Diffuse.Back = float3(1, 1, 1);
-            lighting.Specular.Back = float3(0, 0, 0);
-        }
 
         // Compute each lighting component
         float3 ambient = material.Ambient.rgb * (state.Modes.Ambient.rgb + lighting.Ambient);
@@ -480,11 +475,20 @@ VS_OUTPUT main(VS_INPUT xIn)
         xOut.oB0 = float4(backAmbient + backDiffuse + backEmissive, backMaterial.Diffuse.a);
         xOut.oB1 = float4(backSpecular, 0);
     }
-    else
+
+    // TODO verify if TwoSidedLighting can be enabled independently of Lighting
+    // Diffuse and specular for when lighting is disabled
+    // Use default values. Materials aren't used
+    if (!state.Modes.Lighting)
     {
-        // Use default values. Materials aren't used
-        xOut.oD0 = xOut.oB0 = state.Modes.ColorVertex ? xIn.color[0] : float4(1, 1, 1, 1);
-        xOut.oD1 = xOut.oB1 = state.Modes.ColorVertex ? xIn.color[1] : float4(0, 0, 0, 0);
+        xOut.oD0 = state.Modes.ColorVertex ? xIn.color[0] : float4(1, 1, 1, 1);
+        xOut.oD1 = state.Modes.ColorVertex ? xIn.color[1] : float4(0, 0, 0, 0);
+    }
+
+    if(!state.Modes.TwoSidedLighting)
+    {
+        xOut.oB0 = state.Modes.ColorVertex ? xIn.backColor[0] : float4(1, 1, 1, 1);
+        xOut.oB1 = state.Modes.ColorVertex ? xIn.backColor[1] : float4(0, 0, 0, 0);
     }
 
     xOut.oD0 = saturate(xOut.oD0);
