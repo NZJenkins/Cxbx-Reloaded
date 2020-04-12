@@ -429,52 +429,49 @@ VS_OUTPUT main(const VS_INPUT xIn)
 
     float3 cameraPosWorld = -state.Transforms.View[3].xyz;
 
-    // Materials
-    Material material = DoMaterial(0, xIn.color[0], xIn.color[1]);
-    Material backMaterial = DoMaterial(1, xIn.color[0], xIn.color[1]);
-    
     // Vertex lighting
-    LightingOutput lighting;
     if (state.Modes.Lighting)
     {
+        // Materials
+        Material material = DoMaterial(0, xIn.color[0], xIn.color[1]);
+        Material backMaterial = DoMaterial(1, xIn.color[0], xIn.color[1]);
+        
         float2 powers = float2(material.Power, backMaterial.Power);
 
-        lighting = CalcLighting(vNormWorld, vPosWorld.xyz, vPosView.xyz, powers);
+        LightingOutput lighting = CalcLighting(vNormWorld, vPosWorld.xyz, vPosView.xyz, powers);
 
         if (!state.Modes.TwoSidedLighting)
         {
             lighting.Diffuse.Back = float4(1, 1, 1, 1);
             lighting.Specular.Back = float4(0, 0, 0, 1);
         }
+
+        // Compute each lighting component
+        float4 ambient = material.Ambient * (state.Modes.Ambient + lighting.Ambient);
+        float4 backAmbient = backMaterial.Ambient * (state.Modes.BackAmbient + lighting.Ambient);
+    
+        float4 diffuse = material.Diffuse * lighting.Diffuse.Front;
+        float4 backDiffuse = backMaterial.Diffuse * lighting.Diffuse.Back;
+    
+        float4 specular = material.Specular * lighting.Specular.Front;
+        float4 backSpecular = backMaterial.Specular * lighting.Specular.Back;
+    
+        float4 emissive = material.Emissive;
+        float4 backEmissive = backMaterial.Emissive;
+
+        // Frontface
+        xOut.oD0 = float4(saturate(ambient + diffuse + emissive).rgb, material.Diffuse.a);
+        xOut.oD1 = saturate(specular);
+        // Backface
+        xOut.oB0 = float4(saturate(backAmbient + backDiffuse + backEmissive).rgb, backMaterial.Diffuse.a);
+        xOut.oB1 = saturate(backSpecular);
     }
     else
     {
-        lighting.Ambient = float4(0, 0, 0, 0);
-        lighting.Diffuse.Front = lighting.Diffuse.Back = float4(1, 1, 1, 1);
-        lighting.Specular.Front = lighting.Specular.Back = float4(0, 0, 0, 0);
+        // Use default values. Materials aren't used
+        xOut.oD0 = xOut.oB0 = state.Modes.ColorVertex ? xIn.color[0] : float4(1, 1, 1, 1);
+        xOut.oD1 = xOut.oB1 = state.Modes.ColorVertex ? xIn.color[1] : float4(0, 0, 0, 0);
     }
-
-    // Final lighting
-    float4 ambient = material.Ambient * (state.Modes.Ambient + lighting.Ambient);
-    float4 backAmbient = backMaterial.Ambient * (state.Modes.BackAmbient + lighting.Ambient);
-    
-    float4 diffuse = material.Diffuse * lighting.Diffuse.Front;
-    float4 backDiffuse = backMaterial.Diffuse * lighting.Diffuse.Back;
-    
-    float4 specular = material.Specular * lighting.Specular.Front;
-    float4 backSpecular = backMaterial.Specular * lighting.Specular.Back;
-    
-    float4 emissive = material.Emissive;
-    float4 backEmissive = backMaterial.Emissive;
-
-    // Frontface
-    xOut.oD0 = saturate(ambient + diffuse + emissive);
-    xOut.oD0.a = material.Diffuse.a;
-    xOut.oD1 = saturate(specular);
-    xOut.oD1.a = backMaterial.Diffuse.a;
-    // Backface
-    xOut.oB0 = saturate(backAmbient + backDiffuse + backEmissive);
-    xOut.oB1 = saturate(backSpecular);
 
     float fog = DoFog(vPosView);
     xOut.oFog = fog;
