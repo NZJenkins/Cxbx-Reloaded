@@ -122,6 +122,15 @@ LightingOutput DoPointLight(Light l, float3 vNormWorld, float3 vPosWorld, float3
     return o;
 }
 
+LightingOutput DoSpotLight(Light l, float3 vNormWorld, float3 vPosWorld, float3 toViewerView, float2 powers)
+{
+	LightingOutput o;
+	o.Ambient = l.Ambient.rgb;
+	o.Diffuse.Front = o.Diffuse.Back = float3(0, 0, 0);
+	o.Specular.Front = o.Specular.Back = float3(0, 0, 0);
+	return o;
+}
+
 LightingOutput DoDirectionalLight(Light l, float3 vNormWorld, float3 toViewerView, float2 powers)
 {
     LightingOutput o;
@@ -176,7 +185,7 @@ LightingOutput CalcLighting(float3 vNormWorld, float3 vPosWorld, float3 vPosView
         if(currentLight.Type == LIGHT_TYPE_POINT)
             currentLightOutput = DoPointLight(currentLight, vNormWorld, vPosWorld, toViewerView, powers);
         else if(currentLight.Type == LIGHT_TYPE_SPOT)
-            continue;
+            currentLightOutput = DoSpotLight(currentLight, vNormWorld, vPosWorld, toViewerView, powers);
         else if (currentLight.Type == LIGHT_TYPE_DIRECTIONAL)
             currentLightOutput = DoDirectionalLight(currentLight, vNormWorld, toViewerView, powers);
         else
