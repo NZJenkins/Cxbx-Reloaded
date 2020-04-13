@@ -207,4 +207,6 @@ set_source_files_properties(
   VS_SHADER_MODEL "3.0"
   VS_SHADER_TYPE "Vertex"
   VS_SHADER_OUTPUT_HEADER_FILE "${CXBXR_ROOT_DIR}/src/core/hle/D3D8/Direct3D9/CxbxVertexShaderFvf.h"
+  VS_SHADER_FLAGS /O3
+  VS_SHADER_ENABLE_DEBUG true
 )
