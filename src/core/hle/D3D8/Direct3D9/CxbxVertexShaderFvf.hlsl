@@ -434,26 +434,23 @@ VS_OUTPUT main(VS_INPUT xIn)
 	// Unpack 16 flags from 4 float4 constant registers
     float vRegisterDefaultFlags[16] = (float[16]) vRegisterDefaultFlagsPacked;
 
-    // TODO map all default values to registers
+    // TODO make sure this goes fast
+    // TODO ditch semantics, use texcoord inputs
+    // TODO translate FVFs to vertex declarations
+    // TODO make sure register default flags are actually set properly
     // Map default color values
-	//if (vRegisterDefaultFlags[0]) xIn.pos = vRegisterDefaultValues[0];
-	//if (vRegisterDefaultFlags[1]) xIn.bw = vRegisterDefaultValues[1]; // TODO : Is index 1 correct?
-	//if (vRegisterDefaultFlags[2]) xIn.? = vRegisterDefaultValues[2];
+    if (vRegisterDefaultFlags[0]) xIn.pos = vRegisterDefaultValues[0];
+    if (vRegisterDefaultFlags[1]) xIn.bw = vRegisterDefaultValues[1]; // TODO : Is index 1 correct?
+    if (vRegisterDefaultFlags[2]) xIn.normal = vRegisterDefaultValues[2];
     if (vRegisterDefaultFlags[3]) xIn.color[0] = vRegisterDefaultValues[3];
     if (vRegisterDefaultFlags[4]) xIn.color[1] = vRegisterDefaultValues[4];
-	// TODO : Are below indexed correctly?
-	if (vRegisterDefaultFlags[5]) xIn.backColor[0] = vRegisterDefaultValues[5];
-	if (vRegisterDefaultFlags[6]) xIn.backColor[1] = vRegisterDefaultValues[6];
-	if (vRegisterDefaultFlags[7]) xIn.normal = vRegisterDefaultValues[7];
-	if (vRegisterDefaultFlags[8]) xIn.texcoord[0] = vRegisterDefaultValues[8];
-	if (vRegisterDefaultFlags[9]) xIn.texcoord[1] = vRegisterDefaultValues[9];
-	if (vRegisterDefaultFlags[10]) xIn.texcoord[2] = vRegisterDefaultValues[10];
-	// TODO : Avoid "error X4505: maximum temp register index exceeded" when enabling any more below
-	//if (vRegisterDefaultFlags[11]) xIn.texcoord[3] = vRegisterDefaultValues[11];
-	// if (vRegisterDefaultFlags[12]) xIn.? = vRegisterDefaultValues[12];
-	// if (vRegisterDefaultFlags[13]) xIn.? = vRegisterDefaultValues[13];
-	// if (vRegisterDefaultFlags[14]) xIn.? = vRegisterDefaultValues[14];
-	// if (vRegisterDefaultFlags[15]) xIn.? = vRegisterDefaultValues[15];
+    // if (vRegisterDefaultFlags[5]) xIn.fog = vRegisterDefaultValues[5];
+	if (vRegisterDefaultFlags[7]) xIn.backColor[0] = vRegisterDefaultValues[7];
+	if (vRegisterDefaultFlags[8]) xIn.backColor[1] = vRegisterDefaultValues[8];
+	if (vRegisterDefaultFlags[9]) xIn.texcoord[0] = vRegisterDefaultValues[9];
+	if (vRegisterDefaultFlags[10]) xIn.texcoord[1] = vRegisterDefaultValues[10];
+    if (vRegisterDefaultFlags[11]) xIn.texcoord[2] = vRegisterDefaultValues[11];
+	if (vRegisterDefaultFlags[12]) xIn.texcoord[3] = vRegisterDefaultValues[12];
 
     // World transform with vertex blending
     WorldTransformOutput world = DoWorldTransform(xIn.pos, xIn.normal.xyz, xIn.bw);
