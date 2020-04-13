@@ -47,12 +47,14 @@ struct VS_OUTPUT
 	float4 oT3  : TEXCOORD3; // Texture coordinate set 3
 };
 
-// Vertex position
-static float4 VPosWorld;
-static float4 VPosView;
-// Vertex normal
-static float3 VNormWorld;
-static float3 VNormView;
+struct TransformInfo
+{
+    float4 Position;
+    float3 Normal;
+};
+
+static TransformInfo World;
+static TransformInfo View;
 
 // Vertex lighting
 // Both frontface and backface lighting can be calculated
@@ -80,9 +82,9 @@ LightingInfo DoSpecular(float3 lightDirWorld, float3 toViewerView, float2 powers
     {
         // Blinn-Phong
         // https://learnopengl.com/Advanced-Lighting/Advanced-Lighting
-        float3 lightDirView = mul(lightDirWorld, (float3x3) state.Transforms.View);
+        float3 lightDirView = mul(lightDirWorld, (float3x3) state.Transforms.View); // Premultiply?
         float3 halfway = normalize(toViewerView + lightDirView);
-        float NdotH = dot(VNormView, halfway);
+        float NdotH = dot(View.Normal, halfway);
 
         float3 frontSpecular = pow(abs(NdotH), powers[0]) * lightSpecular.rgb;
         float3 backSpecular = pow(abs(NdotH), powers[1]) * lightSpecular.rgb;
@@ -106,7 +108,7 @@ LightingOutput DoPointLight(Light l, float3 toViewerView, float2 powers)
     o.Specular.Front = o.Specular.Back = float3(0, 0, 0);
 
     // Diffuse
-    float3 toLightWorld = VPosWorld.xyz - l.Position;
+    float3 toLightWorld = World.Position.xyz - l.Position;
     float3 lightDirWorld = normalize(toLightWorld);
     float lightDist = length(toLightWorld);
     // A(Constant) + A(Linear) * dist + A(Exp) * dist^2
@@ -115,7 +117,7 @@ LightingOutput DoPointLight(Light l, float3 toViewerView, float2 powers)
         + l.Attenuation[1] * lightDist
         + l.Attenuation[2] * lightDist * lightDist);
 
-    float NdotL = dot(VNormWorld, lightDirWorld);
+    float NdotL = dot(World.Normal, lightDirWorld);
     float3 lightDiffuse = abs(NdotL * attenuation) * l.Diffuse.rgb;
 
     if (NdotL >= 0.f)
@@ -149,7 +151,7 @@ LightingOutput DoDirectionalLight(Light l, float3 toViewerView, float2 powers)
 
     // Intensity from N . L
     float3 toLightWorld = -normalize(l.Direction); // should we normalize?
-    float NdotL = dot(VNormWorld, toLightWorld);
+    float NdotL = dot(World.Normal, toLightWorld);
     float3 lightDiffuse = abs(NdotL * l.Diffuse.rgb);
 
     // Apply light contribution to front or back face
@@ -182,7 +184,7 @@ LightingOutput CalcLighting(float2 powers)
 
     float3 toViewerView = float3(0, 0, 1);
     if (state.Modes.LocalViewer)
-        toViewerView = normalize(-VPosView.xyz);
+        toViewerView = normalize(-View.Position.xyz);
     
     for (uint i = 0; i < 8; i++)
     {
@@ -208,15 +210,9 @@ LightingOutput CalcLighting(float2 powers)
     return totalLightOutput;
 }
 
-struct WorldTransformOutput
+TransformInfo DoWorldTransform(float4 position, float3 normal, float4 blendWeights)
 {
-    float4 Position;
-    float3 Normal;
-};
-
-WorldTransformOutput DoWorldTransform(float4 position, float3 normal, float4 blendWeights)
-{
-    WorldTransformOutput output;
+    TransformInfo output;
     output.Position = float4(0, 0, 0, 0);
     output.Normal = float3(0, 0, 0);
 
@@ -330,7 +326,7 @@ float DoFog()
     //    return 0;
 
     // We're doing some fog
-    float depth = state.Fog.RangeFogEnable ? length(VPosView.xyz) : abs(VPosView.z);
+    float depth = state.Fog.RangeFogEnable ? length(View.Position.xyz) : abs(View.Position.z);
 
     // We just need to output the depth in oFog (?)
     
@@ -397,12 +393,12 @@ float4 DoTexCoord(int stage, float4 texCoords[4])
     else
     {   
         // Generate texture coordinates
-        float3 reflected = reflect(normalize(VPosView.xyz), VNormView);
+        float3 reflected = reflect(normalize(View.Position.xyz), View.Normal);
         
         if (tState.TexCoordIndexGen == TCI_CAMERASPACENORMAL)
-            texCoord.xyz = VNormView;
+            texCoord.xyz = View.Normal;
         else if (tState.TexCoordIndexGen == TCI_CAMERASPACEPOSITION)
-            texCoord = VPosView;
+            texCoord = View.Position;
         else if (tState.TexCoordIndexGen == TCI_CAMERASPACEREFLECTIONVECTOR)
             texCoord.xyz = reflected;
         // else if TCI_OBJECT TODO is this just model position?
@@ -460,15 +456,19 @@ VS_OUTPUT main(VS_INPUT xIn)
 	if (vRegisterDefaultFlags[12]) xIn.texcoord[3] = vRegisterDefaultValues[12];
 
     // World transform with vertex blending
-    WorldTransformOutput world = DoWorldTransform(xIn.pos, xIn.normal.xyz, xIn.bw);
+    World = DoWorldTransform(xIn.pos, xIn.normal.xyz, xIn.bw);
 
-    // Initialize vertex position and normal info
-    VPosWorld = world.Position;
-    VPosView = mul(VPosWorld, state.Transforms.View);
-    xOut.oPos = mul(VPosView, state.Transforms.Projection);
+    // View transform
+    View.Position = mul(World.Position, state.Transforms.View);
+    View.Normal = mul(World.Normal, (float3x3) state.Transforms.View);
 
-    VNormWorld = normalize(world.Normal);
-    VNormView = mul(VNormWorld, (float3x3) state.Transforms.View);
+    // Optionally normalize camera-space normals
+    // TODO what about world normals? Or move all lighting to camera space like d3d?
+    if (state.Modes.NormalizeNormals)
+        View.Normal = normalize(View.Normal);
+
+    // Projection transform - final position
+    xOut.oPos = mul(View.Position, state.Transforms.Projection);
 
     float3 cameraPosWorld = -state.Transforms.View[3].xyz;
 

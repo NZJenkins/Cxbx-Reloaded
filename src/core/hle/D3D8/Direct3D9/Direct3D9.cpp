@@ -7239,8 +7239,9 @@ void CxbxUpdateNativeD3DResources()
 			g_renderStateBlock.TextureStates[i].TexCoordIndexGen = texCoordIndex >> 16; // D3DTSS_TCI flags
 		}
 
-		// Vertex blending
+		// Misc flags
 		g_renderStateBlock.Modes.VertexBlend = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_VERTEXBLEND);
+		g_renderStateBlock.Modes.NormalizeNormals = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_NORMALIZENORMALS);
 
 		for (int i = 0; i < g_renderStateBlock.Lights.size(); i++) {
 			UpdateLightState(i);
