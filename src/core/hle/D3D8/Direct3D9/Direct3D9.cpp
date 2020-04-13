@@ -7903,9 +7903,9 @@ void UpdateLightState(int enabledLightsIndex) {
 		light->Direction = d3dLight->Direction;
 		light->Range = d3dLight->Range;
 		light->Falloff = d3dLight->Falloff;
-		light->Attenuation0 = d3dLight->Attenuation0;
-		light->Attenuation1 = d3dLight->Attenuation1;
-		light->Attenuation2 = d3dLight->Attenuation2;
+		light->Attenuation.x = d3dLight->Attenuation0;
+		light->Attenuation.y = d3dLight->Attenuation1;
+		light->Attenuation.z = d3dLight->Attenuation2;
 		light->Theta = d3dLight->Theta;
 		light->Phi = d3dLight->Phi;
 }
