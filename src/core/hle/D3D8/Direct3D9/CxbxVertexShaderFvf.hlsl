@@ -104,9 +104,9 @@ LightingOutput DoPointLight(Light l, float3 vNormWorld, float3 vPosWorld, float3
     float lightDist = length(toLightWorld);
     // A(Constant) + A(Linear) * dist + A(Exp) * dist^2
     float attenuation =
-        1 / (l.Attenuation0
-        + l.Attenuation1 * lightDist
-        + l.Attenuation2 * lightDist * lightDist);
+        1 / (l.Attenuation[0]
+        + l.Attenuation[1] * lightDist
+        + l.Attenuation[2] * lightDist * lightDist);
 
     float NdotL = dot(vNormWorld, normalize(toLightWorld)); // should we normalize?
     float3 lightDiffuse = abs(NdotL * attenuation) * l.Diffuse.rgb;

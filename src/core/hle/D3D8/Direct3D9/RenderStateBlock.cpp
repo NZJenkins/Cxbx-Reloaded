@@ -37,6 +37,9 @@ struct Transforms {
 
 // See D3DLIGHT
 struct Light {
+    // TODO in vs_4_0+ when floats are packable
+    // Change colour values to float3
+    // And put something useful in the alpha slot
     float4 Diffuse;
     float4 Specular;
     float4 Ambient;
@@ -47,10 +50,8 @@ struct Light {
     alignas(16) float3 Direction;
     alignas(16) float Type; // 1=Point, 2=Spot, 3=Directional
     //
+    alignas(16) float3 Attenuation;
     alignas(16) float Falloff;
-    alignas(16) float Attenuation0;
-    alignas(16) float Attenuation1;
-    alignas(16) float Attenuation2;
     //
     alignas(16) float Theta;
     alignas(16) float Phi;
