@@ -6,7 +6,7 @@
 uniform float4 vRegisterDefaultValues[16] : register(c192); // Matches CXBX_D3DVS_CONSTVREG_DEFAULT_VALUE_BASE
 uniform float4 vRegisterDefaultFlagsPacked[4] : register(c208); // Matches CXBX_D3DVS_CONSTVREG_DEFAULT_FLAGS_BASE
 
-uniform RenderStateBlock state : register(c0); // TODO : register(c214); // Matches CXBX_D3DVS_FIXEDFUNCSTATE_BASE
+uniform RenderStateBlock state : register(c214); // Matches CXBX_D3DVS_FIXEDFUNCSTATE_BASE
 
 
 // TODO just use texcoord for everything
