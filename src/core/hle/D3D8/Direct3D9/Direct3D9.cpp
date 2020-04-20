@@ -4404,7 +4404,7 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_SetVertexShaderConstant)
 	else
 	if (Register + ConstantCount > X_D3DVS_CONSTREG_COUNT) LOG_TEST_CASE("Register + ConstantCount > X_D3DVS_CONSTREG_COUNT");
 	else
-	for (int i = 0; i < ConstantCount; i++) {
+	for (size_t i = 0; i < ConstantCount; i++) {
 		SetXboxVertexShaderConstant(Register + i, (float*)pConstantData + i * 4);
 	}
 }
@@ -7198,49 +7198,49 @@ float AsFloat(uint32_t value) {
 void CxbxUpdateFixedFunctionStateBlock()
 {
 	// Lighting
-	g_renderStateBlock.Modes.Lighting = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_LIGHTING);
-	g_renderStateBlock.Modes.TwoSidedLighting = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_TWOSIDEDLIGHTING);
-	g_renderStateBlock.Modes.SpecularEnable = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_SPECULARENABLE);
-	g_renderStateBlock.Modes.LocalViewer = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_LOCALVIEWER);
-	g_renderStateBlock.Modes.ColorVertex = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_COLORVERTEX);
+	g_renderStateBlock.Modes.Lighting = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_LIGHTING);
+	g_renderStateBlock.Modes.TwoSidedLighting = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_TWOSIDEDLIGHTING);
+	g_renderStateBlock.Modes.SpecularEnable = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_SPECULARENABLE);
+	g_renderStateBlock.Modes.LocalViewer = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_LOCALVIEWER);
+	g_renderStateBlock.Modes.ColorVertex = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_COLORVERTEX);
 
 	g_renderStateBlock.Modes.Ambient = toVector(XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_AMBIENT));
 	g_renderStateBlock.Modes.BackAmbient = toVector(XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_BACKAMBIENT));
 
 	// Material sources
-	g_renderStateBlock.Modes.AmbientMaterialSource = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_AMBIENTMATERIALSOURCE);
-	g_renderStateBlock.Modes.DiffuseMaterialSource = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_DIFFUSEMATERIALSOURCE);
-	g_renderStateBlock.Modes.SpecularMaterialSource = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_SPECULARMATERIALSOURCE);
-	g_renderStateBlock.Modes.EmissiveMaterialSource = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_EMISSIVEMATERIALSOURCE);
-	g_renderStateBlock.Modes.BackAmbientMaterialSource = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_BACKAMBIENTMATERIALSOURCE);
-	g_renderStateBlock.Modes.BackDiffuseMaterialSource = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_BACKDIFFUSEMATERIALSOURCE);
-	g_renderStateBlock.Modes.BackSpecularMaterialSource = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_BACKSPECULARMATERIALSOURCE);
-	g_renderStateBlock.Modes.BackEmissiveMaterialSource = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_BACKEMISSIVEMATERIALSOURCE);
+	g_renderStateBlock.Modes.AmbientMaterialSource = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_AMBIENTMATERIALSOURCE);
+	g_renderStateBlock.Modes.DiffuseMaterialSource = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_DIFFUSEMATERIALSOURCE);
+	g_renderStateBlock.Modes.SpecularMaterialSource = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_SPECULARMATERIALSOURCE);
+	g_renderStateBlock.Modes.EmissiveMaterialSource = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_EMISSIVEMATERIALSOURCE);
+	g_renderStateBlock.Modes.BackAmbientMaterialSource = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_BACKAMBIENTMATERIALSOURCE);
+	g_renderStateBlock.Modes.BackDiffuseMaterialSource = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_BACKDIFFUSEMATERIALSOURCE);
+	g_renderStateBlock.Modes.BackSpecularMaterialSource = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_BACKSPECULARMATERIALSOURCE);
+	g_renderStateBlock.Modes.BackEmissiveMaterialSource = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_BACKEMISSIVEMATERIALSOURCE);
 
 	// Fog
-	g_renderStateBlock.Fog.Enable = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_FOGENABLE);
-	g_renderStateBlock.Fog.TableMode = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_FOGTABLEMODE);
+	g_renderStateBlock.Fog.Enable = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_FOGENABLE);
+	g_renderStateBlock.Fog.TableMode = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_FOGTABLEMODE);
 	g_renderStateBlock.Fog.Start = AsFloat(XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_FOGSTART));
 	g_renderStateBlock.Fog.End = AsFloat(XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_FOGEND));
 	g_renderStateBlock.Fog.Density = AsFloat(XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_FOGDENSITY));
-	g_renderStateBlock.Fog.RangeFogEnable = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_RANGEFOGENABLE);
+	g_renderStateBlock.Fog.RangeFogEnable = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_RANGEFOGENABLE);
 
 	// Texture things...
 	for (int i = 0; i < 4; i++) {
 		auto transformFlags = XboxTextureStates.Get(i, XTL::X_D3DTSS_TEXTURETRANSFORMFLAGS);
-		g_renderStateBlock.TextureStates[i].TextureTransformFlagsCount = transformFlags & ~D3DTTFF_PROJECTED;
-		g_renderStateBlock.TextureStates[i].TextureTransformFlagsProjected = transformFlags & D3DTTFF_PROJECTED;
+		g_renderStateBlock.TextureStates[i].TextureTransformFlagsCount = (float)(transformFlags & ~D3DTTFF_PROJECTED);
+		g_renderStateBlock.TextureStates[i].TextureTransformFlagsProjected = (float)(transformFlags & D3DTTFF_PROJECTED);
 
 		auto texCoordIndex = XboxTextureStates.Get(i, XTL::X_D3DTSS_TEXCOORDINDEX);
-		g_renderStateBlock.TextureStates[i].TexCoordIndex = texCoordIndex & 0x7; // 8 coords
-		g_renderStateBlock.TextureStates[i].TexCoordIndexGen = texCoordIndex >> 16; // D3DTSS_TCI flags
+		g_renderStateBlock.TextureStates[i].TexCoordIndex = (float)(texCoordIndex & 0x7); // 8 coords
+		g_renderStateBlock.TextureStates[i].TexCoordIndexGen = (float)(texCoordIndex >> 16); // D3DTSS_TCI flags
 	}
 
 	// Misc flags
-	g_renderStateBlock.Modes.VertexBlend = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_VERTEXBLEND);
-	g_renderStateBlock.Modes.NormalizeNormals = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_NORMALIZENORMALS);
+	g_renderStateBlock.Modes.VertexBlend = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_VERTEXBLEND);
+	g_renderStateBlock.Modes.NormalizeNormals = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_NORMALIZENORMALS);
 
-	for (int i = 0; i < g_renderStateBlock.Lights.size(); i++) {
+	for (size_t i = 0; i < g_renderStateBlock.Lights.size(); i++) {
 		UpdateLightState(i);
 	}
 
@@ -7874,7 +7874,7 @@ public:
 
 		// Check to see if the light is already enabled
 		// Disable it if so
-		for (int i = 0; i < EnabledLights.size(); i++) {
+		for (size_t i = 0; i < EnabledLights.size(); i++) {
 			if (EnabledLights[i] == index) {
 				// If enabling do nothing
 				// if disabling, disable the light
@@ -7921,7 +7921,7 @@ void UpdateLightState(int enabledLightsIndex) {
 		auto d3dLight = &fakeD3DState.Lights[d3dLightIndex];
 
 		// Map D3D light to state struct
-		light->Type = (int) d3dLight->Type;
+		light->Type = (float)((int)d3dLight->Type);
 		light->Diffuse = toVector(d3dLight->Diffuse);
 		light->Specular = toVector(d3dLight->Specular);
 		light->Ambient = toVector(d3dLight->Ambient);
