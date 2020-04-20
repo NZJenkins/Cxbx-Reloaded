@@ -32,11 +32,13 @@ static const uint fogCoord = 5;     // Has no X_D3DFVF_* ! See X_D3DVSDE_FOG    
 static const uint pointSize = 6;    // Has no X_D3DFVF_* ! See X_D3DVSDE_POINTSIZE
 static const uint backDiffuse = 7;  // Has no X_D3DFVF_* ! See X_D3DVSDE_BACKDIFFUSE was float4 backColor[2] : TEXCOORD4;
 static const uint backSpecular = 8; // Has no X_D3DFVF_* ! See X_D3DVSDE_BACKSPECULAR
-static const uint texcoord0 = 9;    // See X_D3DFVF_TEX0     / X_D3DVSDE_TEXCOORD0   was float4 texcoord[4] : TEXCOORD;
-static const uint texcoord1 = 10;   // See X_D3DFVF_TEX1     / X_D3DVSDE_TEXCOORD1
-static const uint texcoord2 = 11;   // See X_D3DFVF_TEX2     / X_D3DVSDE_TEXCOORD2
-static const uint texcoord3 = 12;   // See X_D3DFVF_TEX3     / X_D3DVSDE_TEXCOORD3
-static const uint reserved = 13;    // Has no X_D3DFVF_* ! Reaches up to 15
+static const uint texcoord0 = 9;    // See X_D3DFVF_TEX1     / X_D3DVSDE_TEXCOORD0   was float4 texcoord[4] : TEXCOORD;
+static const uint texcoord1 = 10;   // See X_D3DFVF_TEX2     / X_D3DVSDE_TEXCOORD1
+static const uint texcoord2 = 11;   // See X_D3DFVF_TEX3     / X_D3DVSDE_TEXCOORD2
+static const uint texcoord3 = 12;   // See X_D3DFVF_TEX4     / X_D3DVSDE_TEXCOORD3
+static const uint reserved0 = 13;   // Has no X_D3DFVF_*     / X_D3DVSDE_*
+static const uint reserved1 = 14;   // Has no X_D3DFVF_*     / X_D3DVSDE_*
+static const uint reserved2 = 15;   // Has no X_D3DFVF_*     / X_D3DVSDE_*
 
 // Output registers
 struct VS_OUTPUT

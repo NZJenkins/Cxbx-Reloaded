@@ -46,18 +46,24 @@ const char *NV2AMethodToString(DWORD dwMethod); // forward
 
 static void DbgDumpMesh(WORD *pIndexData, DWORD dwCount);
 
-// Determine the size (in number of floating point texture coordinates) of the texture format (indexed 0 .. 3).
-// This is the reverse of the D3DFVF_TEXCOORDSIZE[0..3] macros.
-int DxbxFVF_GetNumberOfTextureCoordinates(DWORD dwFVF, int aTextureIndex)
+// Determine the number of floating point texture coordinates for a given texture in the FVF texture format (indexed 0 .. 3).
+// This is the reverse of the X_D3DFVF_TEXCOORDSIZE[0..3] macros.
+constexpr unsigned CxbxGetXboxFVFNumberOfTextureDimensions(const XTL::DWORD XboxFVF, const unsigned aTextureIndex)
 {
-	// See D3DFVF_TEXCOORDSIZE1()
-	switch ((dwFVF >> ((aTextureIndex * 2) + 16)) & 3) {
-	case D3DFVF_TEXTUREFORMAT1: return 1; // One floating point value
-	case D3DFVF_TEXTUREFORMAT2: return 2; // Two floating point values
-	case D3DFVF_TEXTUREFORMAT3: return 3; // Three floating point values
-	case D3DFVF_TEXTUREFORMAT4: return 4; // Four floating point values
+	assert(VshHandleIsFVF(XboxFVF));
+	assert(aTextureIndex < NV2A_MAX_TEXTURES);
+
+	// Note : Shift the inverse of X_D3DFVF_TEXCOORDSIZE1 et al, and mask using
+	// X_D3DFVF_TEXTUREFORMAT1 (which has all bits set) so we can switch :
+	const DWORD TextureFormat = (XboxFVF >> X_D3DFVF_TEXCOORDSIZE_SHIFT(aTextureIndex))& X_D3DFVF_TEXTUREFORMAT1;
+	switch (TextureFormat) {
+	case X_D3DFVF_TEXTUREFORMAT1: return 1; // One floating point value (a 1-dimensional texture)
+	case X_D3DFVF_TEXTUREFORMAT2: return 2; // Two floating point values (a 2-dimensional texture)
+	case X_D3DFVF_TEXTUREFORMAT3: return 3; // Three floating point values (a 3-dimensional texture)
+	case X_D3DFVF_TEXTUREFORMAT4: return 4; // Four floating point values (a 4-dimensional texture)
 	default:
-		//assert(false || "DxbxFVF_GetNumberOfTextureCoordinates : Unhandled case");
+		//assert(false || "CxbxGetXboxFVFNumberOfTextureDimensions : Unhandled case");
+		// DEFAULT_UNREACHABLE
 		return 0;
 	}
 }
@@ -109,7 +115,7 @@ UINT DxbxFVFToVertexSizeInBytes(DWORD dwFVF, BOOL bIncludeTextures)
 		int NrTextures = ((dwFVF & D3DFVF_TEXCOUNT_MASK) >> D3DFVF_TEXCOUNT_SHIFT);
 		while (NrTextures > 0) {
 			NrTextures--;
-			Result += DxbxFVF_GetNumberOfTextureCoordinates(dwFVF, NrTextures) * sizeof(FLOAT);
+			Result += CxbxGetXboxFVFNumberOfTextureDimensions(dwFVF, NrTextures) * sizeof(FLOAT);
 		}
 	}
 

@@ -34,7 +34,7 @@
 #include "core\hle\D3D8\Direct3D9\Direct3D9.h" // For g_pD3DDevice
 #include "core\hle\D3D8\Direct3D9\WalkIndexBuffer.h" // for WalkIndexBuffer
 #include "core\hle\D3D8\ResourceTracker.h"
-#include "core\hle\D3D8\XbPushBuffer.h" // for DxbxFVF_GetNumberOfTextureCoordinates
+#include "core\hle\D3D8\XbPushBuffer.h" // for CxbxGetXboxFVFNumberOfTextureDimensions
 #include "core\hle\D3D8\XbVertexBuffer.h"
 #include "core\hle\D3D8\XbConvert.h"
 
@@ -238,7 +238,7 @@ void CxbxVertexBufferConverter::ConvertStream
 		for (unsigned int i = 0; i < XTL::X_D3DTS_STAGECOUNT; i++) {
 			// Only normalize coordinates used by the FVF shader :
 			if (i + 1 <= dwTexN) {
-				pActivePixelContainer[i].NrTexCoords = DxbxFVF_GetNumberOfTextureCoordinates(XboxFVF, i);
+				pActivePixelContainer[i].NrTexCoords = CxbxGetXboxFVFNumberOfTextureDimensions(XboxFVF, i);
 				// TODO : Use GetXboxBaseTexture()
 				XTL::X_D3DBaseTexture *pXboxBaseTexture = g_pXbox_SetTexture[i];
 				if (pXboxBaseTexture != xbnullptr) {
@@ -855,7 +855,7 @@ VOID EmuFlushIVB()
 	size_t TexSize[XTL::X_D3DTS_STAGECOUNT]; // Xbox supports up to 4 textures
 
 	for (unsigned int i = 0; i < dwTexN; i++) {
-		TexSize[i] = DxbxFVF_GetNumberOfTextureCoordinates(dwCurFVF, i);
+		TexSize[i] = CxbxGetXboxFVFNumberOfTextureDimensions(dwCurFVF, i);
 	}
 
 	// Use a tooling function to determine the vertex stride :

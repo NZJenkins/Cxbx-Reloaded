@@ -8414,6 +8414,11 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_RunVertexStateShader)
 typedef uint64_t load_shader_program_key_t;
 std::unordered_map<load_shader_program_key_t, DWORD> g_LoadVertexShaderProgramCache;
 
+constexpr unsigned CxbxGetXboxFVFTextureCount(const XTL::DWORD XboxFVF)
+{
+	return (XboxFVF & X_D3DFVF_TEXCOUNT_MASK) >> X_D3DFVF_TEXCOUNT_SHIFT;
+}
+
 // ******************************************************************
 // * patch: D3DDevice_LoadVertexShaderProgram
 // ******************************************************************
@@ -8502,27 +8507,18 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_LoadVertexShaderProgram)
         }
 
         // Write Texture Coordinates
-        int textureCount = (g_Xbox_VertexShader_Handle & X_D3DFVF_TEXCOUNT_MASK) >> X_D3DFVF_TEXCOUNT_SHIFT;
-        assert(textureCount <= 4); // Safeguard, since the X_D3DFVF_TEXCOUNT bitfield could contain invalid values (5 up to 15)
-        for (int i = 0; i < textureCount; i++) {
-            int numberOfCoordinates = 0;
+        unsigned textureCount = CxbxGetXboxFVFTextureCount(g_Xbox_VertexShader_Handle);
+        assert(textureCount <= NV2A_MAX_TEXTURES); // Safeguard, since the X_D3DFVF_TEXCOUNT bitfield could contain invalid values (5 up to 15)
+        for (unsigned i = 0; i < textureCount; i++) {
+			static const int VertexShaderDeclarationType_PerTextureDimensions[1+4] = {
+				0, // For zero dimensions, we have no type
+				X_D3DVSDT_FLOAT1, X_D3DVSDT_FLOAT2, X_D3DVSDT_FLOAT3, X_D3DVSDT_FLOAT4 };
 
-			// Note : X_D3DFVF_TEXCOORDSIZE1 must be used as mask, since it contains all possible texcoord bits (0x3) :
-			const DWORD MaskedTexCoordSize = (g_Xbox_VertexShader_Handle & X_D3DFVF_TEXCOORDSIZE1(i));
-            if (MaskedTexCoordSize == (DWORD)X_D3DFVF_TEXCOORDSIZE1(i)) {
-                numberOfCoordinates = X_D3DVSDT_FLOAT1;
-            } else
-            if (MaskedTexCoordSize == (DWORD)X_D3DFVF_TEXCOORDSIZE2(i)) {
-                numberOfCoordinates = X_D3DVSDT_FLOAT2;
-            } else
-            if (MaskedTexCoordSize == (DWORD)X_D3DFVF_TEXCOORDSIZE3(i)) {
-                numberOfCoordinates = X_D3DVSDT_FLOAT3;
-            } else
-            if (MaskedTexCoordSize == (DWORD)X_D3DFVF_TEXCOORDSIZE4(i)) {
-                numberOfCoordinates = X_D3DVSDT_FLOAT4;
-            }
+			const int NrTextureDimensions = CxbxGetXboxFVFNumberOfTextureDimensions(g_Xbox_VertexShader_Handle, i);
+			assert(NrTextureDimensions >= 1 && NrTextureDimensions <= 4);
 
-            CxbxXboxVertexDeclaration[index++] = X_D3DVSD_REG(X_D3DVSDE_TEXCOORD0 + i, numberOfCoordinates);
+			CxbxXboxVertexDeclaration[index++] = X_D3DVSD_REG(X_D3DVSDE_TEXCOORD0 + i,
+				VertexShaderDeclarationType_PerTextureDimensions[NrTextureDimensions]);
         }
 
         // Write Declaration End

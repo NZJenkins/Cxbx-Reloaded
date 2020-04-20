@@ -27,7 +27,7 @@
 
 #include "core/hle/D3D8/XbVertexBuffer.h" // for CxbxDrawContext
 
-extern int DxbxFVF_GetNumberOfTextureCoordinates(DWORD dwFVF, int aTextureIndex);
+extern constexpr unsigned CxbxGetXboxFVFNumberOfTextureDimensions(const XTL::DWORD XboxFVF, const unsigned aTextureIndex);
 extern UINT DxbxFVFToVertexSizeInBytes(DWORD dwFVF, BOOL bIncludeTextures);
 
 extern void CxbxDrawIndexed(CxbxDrawContext &DrawContext);
