@@ -222,16 +222,12 @@ extern ShaderType EmuGetShaderInfo(IntermediateVertexShader* pIntermediateShader
 	return ShaderType::Compilable;
 }
 
-HRESULT CompileHlsl(const std::string& hlsl, ID3DBlob** ppHostShader) {
-	// Level 0 for fastest runtime compilation
-	// TODO Can we recompile an optimized shader in the background?
-	UINT flags1 = D3DCOMPILE_OPTIMIZATION_LEVEL0;
-
+HRESULT CompileHlsl(const std::string& hlsl, ID3DBlob** ppHostShader)
+{
 	// TODO include header in vertex shader
 	//XTL::X_VSH_SHADER_HEADER* pXboxVertexShaderHeader = (XTL::X_VSH_SHADER_HEADER*)pXboxFunction;
 	ID3DBlob* pErrors = nullptr;
 	HRESULT             hRet = 0;
-
 
 	UINT flags1 = D3DCOMPILE_OPTIMIZATION_LEVEL3 | D3DCOMPILE_AVOID_FLOW_CONTROL;
 	hRet = D3DCompile(
