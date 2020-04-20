@@ -3,8 +3,11 @@
 // todo rename Fvf => FixedFunc
 
 // Default values for vertex registers, and whether to use them
-uniform float4 vRegisterDefaultValues[16] : register(c192); // Matches CXBX_D3DVS_CONSTVREG_DEFAULT_VALUE_BASE
-uniform float4 vRegisterDefaultFlagsPacked[4] : register(c208); // Matches CXBX_D3DVS_CONSTVREG_DEFAULT_FLAGS_BASE
+uniform float4 vRegisterDefaultValues[16] : register(c192); // Matches CXBX_D3DVS_ATTRDATA_BASE
+uniform float4 vRegisterDefaultFlagsPacked[4] : register(c208); // Matches CXBX_D3DVS_ATTRFLAG_BASE
+
+//uniform float4 xboxViewportScale   : register(c212); // Matches CXBX_D3DVS_VIEWPORT_MIRROR_SCALE_BASE
+//uniform float4 xboxViewportOffset  : register(c213); // Matches CXBX_D3DVS_VIEWPORT_MIRROR_OFFSET_BASE
 
 uniform RenderStateBlock state : register(c214); // Matches CXBX_D3DVS_FIXEDFUNCSTATE_BASE
 

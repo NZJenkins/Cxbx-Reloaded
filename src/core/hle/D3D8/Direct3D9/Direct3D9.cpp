@@ -1019,6 +1019,8 @@ void SetFixedFunctionShader() {
 	g_pD3DDevice->SetVertexShader(fvfShader);
 }
 
+void CxbxUpdateVertexConstantRegistersInDeclaration(const CxbxVertexShaderInfo* VertexShaderInfo); // forward declaration to avoid code moving
+
 void SetCxbxVertexShader(CxbxVertexShader* pCxbxVertexShader) {
 
 	LOG_INIT
@@ -1052,15 +1054,22 @@ void SetCxbxVertexShader(CxbxVertexShader* pCxbxVertexShader) {
 
 	// Set vertex shader constants if necessary
 	if (pHostShader) {
-		// Titles can specify default values for registers via calls like SetVertexData4f
-		// HLSL shaders need to know whether to use vertex data or default vertex shader values
-		// Any register not in the vertex declaration should be set to the default value
-		float vertexDefaultFlags[X_VSH_MAX_ATTRIBUTES];
-		for (int i = 0; i < X_VSH_MAX_ATTRIBUTES; i++) {
-			vertexDefaultFlags[i] = pCxbxVertexShader->VertexShaderInfo.vRegisterInDeclaration[i] ? 0.0f : 1.0f;
-		}
-		g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_CONSTVREG_DEFAULT_FLAGS_BASE, vertexDefaultFlags, CXBX_D3DVS_CONSTVREG_DEFAULT_FLAGS_SIZE);
+		CxbxUpdateVertexConstantRegistersInDeclaration(&(pCxbxVertexShader->VertexShaderInfo));
 	}
+}
+
+void CxbxUpdateVertexConstantRegistersInDeclaration(const CxbxVertexShaderInfo *VertexShaderInfo)
+{
+	// Titles can specify default values for registers via calls like SetVertexData4f
+	// HLSL shaders need to know whether to use vertex data or default vertex shader values
+	// Any register not in the vertex declaration should be set to the default value
+	float vertexDefaultFlags[X_VSH_MAX_ATTRIBUTES];
+
+	for (int i = 0; i < X_VSH_MAX_ATTRIBUTES; i++) {
+		vertexDefaultFlags[i] = (VertexShaderInfo != nullptr && VertexShaderInfo->vRegisterInDeclaration[i]) ? 0.0f : 1.0f;
+	}
+
+	g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_ATTRFLAG_BASE, vertexDefaultFlags, CXBX_D3DVS_ATTRFLAG_BASE);
 }
 
 // Forward declaration of CxbxGetPixelContainerMeasures to prevent
@@ -4720,18 +4729,29 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_SetVertexData4f)
 		if (!(pXboxVertexShader->Flags & 0x10/*=X_VERTEXSHADER_PROGRAM*/)) {
 			ActiveVertexAttributeFlags = pXboxVertexShader->Flags;
 		}
+	}
 
-		// If we have an active vertex shader, we also write the input to a vertex shader constant
+	// Note : The Vertex (Attribute) Data (values) being set here
+	// have to be made available to host shaders unconditionally.
+	// This, because even when a shader handle is not yet set right
+	// now, it could still be set later. So we always store this data.
+
+	// TODO : Extract this block into a CxbxSetVertexAttributeData() function
+	{
+		// TODO : Should the a,b,c,d values undergo the same conversion that's
+		// applied in EmuFlushIVB() to values in g_InlineVertexBuffer_Table?
+
+		// Write the Xbox vertex attribute data input value to a corresponding host vertex shader constant
 		// This allows us to implement Xbox functionality where SetVertexData4f can be used to specify attributes
 		// not present in the vertex declaration.
 		// We use range 192 and up to store these values, as Xbox vertex shader constants stop at c191!
-		// (See CXBX_D3DVS_CONSTVREG_DEFAULT_VALUE_BASE)
+		// (See CXBX_D3DVS_ATTRDATA_BASE)
 		FLOAT values[] = {a,b,c,d};
 		if (Register < 0) LOG_TEST_CASE("Register < 0");
 		else
-		if (Register >= X_VSH_MAX_ATTRIBUTES) LOG_TEST_CASE("Register >= 16");
+		if (Register >= X_VSH_MAX_ATTRIBUTES/* == CXBX_D3DVS_ATTRDATA_SIZE == 16*/) LOG_TEST_CASE("Register >= 16");
 		else
-		g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_CONSTVREG_DEFAULT_VALUE_BASE + Register, values, 1);
+		g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_ATTRDATA_BASE + Register, values, 1);
 	}
 
 	// Grow g_InlineVertexBuffer_Table to contain at least current, and a potentially next vertex
@@ -7175,6 +7195,60 @@ float AsFloat(uint32_t value) {
 	return *(float*)&v;
 }
 
+void CxbxUpdateFixedFunctionStateBlock()
+{
+	// Lighting
+	g_renderStateBlock.Modes.Lighting = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_LIGHTING);
+	g_renderStateBlock.Modes.TwoSidedLighting = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_TWOSIDEDLIGHTING);
+	g_renderStateBlock.Modes.SpecularEnable = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_SPECULARENABLE);
+	g_renderStateBlock.Modes.LocalViewer = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_LOCALVIEWER);
+	g_renderStateBlock.Modes.ColorVertex = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_COLORVERTEX);
+
+	g_renderStateBlock.Modes.Ambient = toVector(XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_AMBIENT));
+	g_renderStateBlock.Modes.BackAmbient = toVector(XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_BACKAMBIENT));
+
+	// Material sources
+	g_renderStateBlock.Modes.AmbientMaterialSource = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_AMBIENTMATERIALSOURCE);
+	g_renderStateBlock.Modes.DiffuseMaterialSource = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_DIFFUSEMATERIALSOURCE);
+	g_renderStateBlock.Modes.SpecularMaterialSource = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_SPECULARMATERIALSOURCE);
+	g_renderStateBlock.Modes.EmissiveMaterialSource = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_EMISSIVEMATERIALSOURCE);
+	g_renderStateBlock.Modes.BackAmbientMaterialSource = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_BACKAMBIENTMATERIALSOURCE);
+	g_renderStateBlock.Modes.BackDiffuseMaterialSource = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_BACKDIFFUSEMATERIALSOURCE);
+	g_renderStateBlock.Modes.BackSpecularMaterialSource = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_BACKSPECULARMATERIALSOURCE);
+	g_renderStateBlock.Modes.BackEmissiveMaterialSource = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_BACKEMISSIVEMATERIALSOURCE);
+
+	// Fog
+	g_renderStateBlock.Fog.Enable = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_FOGENABLE);
+	g_renderStateBlock.Fog.TableMode = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_FOGTABLEMODE);
+	g_renderStateBlock.Fog.Start = AsFloat(XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_FOGSTART));
+	g_renderStateBlock.Fog.End = AsFloat(XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_FOGEND));
+	g_renderStateBlock.Fog.Density = AsFloat(XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_FOGDENSITY));
+	g_renderStateBlock.Fog.RangeFogEnable = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_RANGEFOGENABLE);
+
+	// Texture things...
+	for (int i = 0; i < 4; i++) {
+		auto transformFlags = XboxTextureStates.Get(i, XTL::X_D3DTSS_TEXTURETRANSFORMFLAGS);
+		g_renderStateBlock.TextureStates[i].TextureTransformFlagsCount = transformFlags & ~D3DTTFF_PROJECTED;
+		g_renderStateBlock.TextureStates[i].TextureTransformFlagsProjected = transformFlags & D3DTTFF_PROJECTED;
+
+		auto texCoordIndex = XboxTextureStates.Get(i, XTL::X_D3DTSS_TEXCOORDINDEX);
+		g_renderStateBlock.TextureStates[i].TexCoordIndex = texCoordIndex & 0x7; // 8 coords
+		g_renderStateBlock.TextureStates[i].TexCoordIndexGen = texCoordIndex >> 16; // D3DTSS_TCI flags
+	}
+
+	// Misc flags
+	g_renderStateBlock.Modes.VertexBlend = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_VERTEXBLEND);
+	g_renderStateBlock.Modes.NormalizeNormals = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_NORMALIZENORMALS);
+
+	for (int i = 0; i < g_renderStateBlock.Lights.size(); i++) {
+		UpdateLightState(i);
+	}
+
+	const int CXBX_D3DVS_FIXEDFUNCSTATE_SIZE = (sizeof(RenderStateBlock) + CXBX_D3DVS_SLOT_SIZE_IN_BYTES - 1) / CXBX_D3DVS_SLOT_SIZE_IN_BYTES; // == 177 TODO : Reduce size; Keep comment updated
+
+	auto hRet = g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_FIXEDFUNCSTATE_BASE, (float*)&g_renderStateBlock, CXBX_D3DVS_FIXEDFUNCSTATE_SIZE);
+}
+
 void CxbxUpdateNativeD3DResources()
 {
 	// Before we start, make sure our resource cache stays limited in size
@@ -7182,8 +7256,11 @@ void CxbxUpdateNativeD3DResources()
 
     EmuUpdateActiveTextureStages();
 
-	auto nv2a = g_NV2A->GetDeviceState();
-	if (!isFixedFunctionMode) {
+	if (isFixedFunctionMode) {
+		CxbxUpdateFixedFunctionStateBlock();
+	} else {
+		auto nv2a = g_NV2A->GetDeviceState();
+
 		// Some titles set Vertex Shader constants directly via pushbuffers rather than through D3D
 		// We handle that case by updating any constants that have the dirty flag set on the nv2a.
 		for (int i = 0; i < X_D3DVS_CONSTREG_COUNT; i++) {
@@ -7198,58 +7275,6 @@ void CxbxUpdateNativeD3DResources()
 			}
 		}
 		g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_CONSTREG_XBOX_BASE, (float*)&g_vshConstants, CXBX_D3DVS_CONSTREG_XBOX_SIZE);
-	}
-	else {
-		// Lighting
-		g_renderStateBlock.Modes.Lighting = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_LIGHTING);
-		g_renderStateBlock.Modes.TwoSidedLighting = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_TWOSIDEDLIGHTING);
-		g_renderStateBlock.Modes.SpecularEnable = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_SPECULARENABLE);
-		g_renderStateBlock.Modes.LocalViewer = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_LOCALVIEWER);
-		g_renderStateBlock.Modes.ColorVertex = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_COLORVERTEX);
-
-		g_renderStateBlock.Modes.Ambient = toVector(XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_AMBIENT));
-		g_renderStateBlock.Modes.BackAmbient = toVector(XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_BACKAMBIENT));
-
-		// Material sources
-		g_renderStateBlock.Modes.AmbientMaterialSource = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_AMBIENTMATERIALSOURCE);
-		g_renderStateBlock.Modes.DiffuseMaterialSource = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_DIFFUSEMATERIALSOURCE);
-		g_renderStateBlock.Modes.SpecularMaterialSource = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_SPECULARMATERIALSOURCE);
-		g_renderStateBlock.Modes.EmissiveMaterialSource = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_EMISSIVEMATERIALSOURCE);
-		g_renderStateBlock.Modes.BackAmbientMaterialSource = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_BACKAMBIENTMATERIALSOURCE);
-		g_renderStateBlock.Modes.BackDiffuseMaterialSource = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_BACKDIFFUSEMATERIALSOURCE);
-		g_renderStateBlock.Modes.BackSpecularMaterialSource = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_BACKSPECULARMATERIALSOURCE);
-		g_renderStateBlock.Modes.BackEmissiveMaterialSource = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_BACKEMISSIVEMATERIALSOURCE);
-
-		// Fog
-		g_renderStateBlock.Fog.Enable = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_FOGENABLE);
-		g_renderStateBlock.Fog.TableMode = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_FOGTABLEMODE);
-		g_renderStateBlock.Fog.Start = AsFloat(XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_FOGSTART));
-		g_renderStateBlock.Fog.End = AsFloat(XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_FOGEND));
-		g_renderStateBlock.Fog.Density = AsFloat(XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_FOGDENSITY));
-		g_renderStateBlock.Fog.RangeFogEnable = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_RANGEFOGENABLE);
-
-		// Texture things...
-		for (int i = 0; i < 4; i++) {
-			auto transformFlags = XboxTextureStates.Get(i, XTL::X_D3DTSS_TEXTURETRANSFORMFLAGS);
-			g_renderStateBlock.TextureStates[i].TextureTransformFlagsCount = transformFlags & ~D3DTTFF_PROJECTED;
-			g_renderStateBlock.TextureStates[i].TextureTransformFlagsProjected = transformFlags & D3DTTFF_PROJECTED;
-
-			auto texCoordIndex = XboxTextureStates.Get(i, XTL::X_D3DTSS_TEXCOORDINDEX);
-			g_renderStateBlock.TextureStates[i].TexCoordIndex = texCoordIndex & 0x7; // 8 coords
-			g_renderStateBlock.TextureStates[i].TexCoordIndexGen = texCoordIndex >> 16; // D3DTSS_TCI flags
-		}
-
-		// Misc flags
-		g_renderStateBlock.Modes.VertexBlend = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_VERTEXBLEND);
-		g_renderStateBlock.Modes.NormalizeNormals = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_NORMALIZENORMALS);
-
-		for (int i = 0; i < g_renderStateBlock.Lights.size(); i++) {
-			UpdateLightState(i);
-		}
-
-		const int CXBX_D3DVS_FIXEDFUNCSTATE_SIZE = (sizeof(RenderStateBlock) + CXBX_D3DVS_SLOT_SIZE_IN_BYTES - 1) / CXBX_D3DVS_SLOT_SIZE_IN_BYTES;
-
-		auto hRet = g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_FIXEDFUNCSTATE_BASE, (float*)&g_renderStateBlock, CXBX_D3DVS_FIXEDFUNCSTATE_SIZE);
 	}
 
     // NOTE: Order is important here

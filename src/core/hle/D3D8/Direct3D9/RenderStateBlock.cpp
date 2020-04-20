@@ -1,6 +1,6 @@
 // C++ / HLSL shared state block for fixed function support
-#pragma once
 #ifdef  __cplusplus
+#pragma once
 
 // #include <DirectXMath.h>
 #include <d3d9.h>
