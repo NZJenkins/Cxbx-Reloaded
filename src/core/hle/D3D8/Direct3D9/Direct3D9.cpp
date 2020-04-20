@@ -8507,16 +8507,18 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_LoadVertexShaderProgram)
         for (int i = 0; i < textureCount; i++) {
             int numberOfCoordinates = 0;
 
-            if ((g_Xbox_VertexShader_Handle & X_D3DFVF_TEXCOORDSIZE1(i)) == (DWORD)X_D3DFVF_TEXCOORDSIZE1(i)) {
+			// Note : X_D3DFVF_TEXCOORDSIZE1 must be used as mask, since it contains all possible texcoord bits (0x3) :
+			const DWORD MaskedTexCoordSize = (g_Xbox_VertexShader_Handle & X_D3DFVF_TEXCOORDSIZE1(i));
+            if (MaskedTexCoordSize == (DWORD)X_D3DFVF_TEXCOORDSIZE1(i)) {
                 numberOfCoordinates = X_D3DVSDT_FLOAT1;
-            }
-            if ((g_Xbox_VertexShader_Handle & X_D3DFVF_TEXCOORDSIZE2(i)) == (DWORD)X_D3DFVF_TEXCOORDSIZE2(i)) {
+            } else
+            if (MaskedTexCoordSize == (DWORD)X_D3DFVF_TEXCOORDSIZE2(i)) {
                 numberOfCoordinates = X_D3DVSDT_FLOAT2;
-            }
-            if ((g_Xbox_VertexShader_Handle & X_D3DFVF_TEXCOORDSIZE3(i)) == (DWORD)X_D3DFVF_TEXCOORDSIZE3(i)) {
+            } else
+            if (MaskedTexCoordSize == (DWORD)X_D3DFVF_TEXCOORDSIZE3(i)) {
                 numberOfCoordinates = X_D3DVSDT_FLOAT3;
-            }
-            if ((g_Xbox_VertexShader_Handle & X_D3DFVF_TEXCOORDSIZE4(i)) == (DWORD)X_D3DFVF_TEXCOORDSIZE4(i)) {
+            } else
+            if (MaskedTexCoordSize == (DWORD)X_D3DFVF_TEXCOORDSIZE4(i)) {
                 numberOfCoordinates = X_D3DVSDT_FLOAT4;
             }
 
