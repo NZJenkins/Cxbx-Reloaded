@@ -12,27 +12,31 @@ uniform float4 vRegisterDefaultFlagsPacked[4] : register(c208); // Matches CXBX_
 uniform RenderStateBlock state : register(c214); // Matches CXBX_D3DVS_FIXEDFUNCSTATE_BASE
 
 
-// TODO just use texcoord for everything
 // Input registers
 struct VS_INPUT
 {
-	// Position
-	// BlendWeight
-	// Normal
-	// Diffuse
-	// Spec
-	// Fog
-	// Unused?
-	// Backface Diffuse
-	// Backface Specular
-	// TexCoord 0 - 3
-    float4 pos : POSITION;
-    float4 bw : BLENDWEIGHT;
-    float4 color[2] : COLOR;
-    float4 backColor[2] : TEXCOORD4;
-    float4 normal : NORMAL;
-    float4 texcoord[4] : TEXCOORD;
+	float4 v[16] : TEXCOORD;
 };
+
+// Input register indices (also known as attributes, as given in VS_INPUT.v array)
+// TODO : Convert FVF codes on CPU to a vertex declaration with these standardized register indices:
+// NOTE : Converting FVF vertex indices must also consider NV2A vertex attribute 'slot mapping',
+// as set in NV2A_VTXFMT/NV097_SET_VERTEX_DATA_ARRAY_FORMAT!
+// TODO : Rename these into SLOT_POSITION, SLOT_WEIGHT, SLOT_TEXTURE0, SLOT_TEXTURE3, etc :
+static const uint position = 0;     // See X_D3DFVF_XYZ      / X_D3DVSDE_POSITION    was float4 pos : POSITION;
+static const uint weight = 1;       // See X_D3DFVF_XYZB1-4  / X_D3DVSDE_BLENDWEIGHT was float4 bw : BLENDWEIGHT;
+static const uint normal = 2;       // See X_D3DFVF_NORMAL   / X_D3DVSDE_NORMAL      was float4 normal : NORMAL; // Note : Only normal.xyz is used. 
+static const uint diffuse = 3;      // See X_D3DFVF_DIFFUSE  / X_D3DVSDE_DIFFUSE     was float4 color[2] : COLOR;
+static const uint specular = 4;     // See X_D3DFVF_SPECULAR / X_D3DVSDE_SPECULAR
+static const uint fogCoord = 5;     // Has no X_D3DFVF_* ! See X_D3DVSDE_FOG         Note : Only fog.x is used.
+static const uint pointSize = 6;    // Has no X_D3DFVF_* ! See X_D3DVSDE_POINTSIZE
+static const uint backDiffuse = 7;  // Has no X_D3DFVF_* ! See X_D3DVSDE_BACKDIFFUSE was float4 backColor[2] : TEXCOORD4;
+static const uint backSpecular = 8; // Has no X_D3DFVF_* ! See X_D3DVSDE_BACKSPECULAR
+static const uint texcoord0 = 9;    // See X_D3DFVF_TEX0     / X_D3DVSDE_TEXCOORD0   was float4 texcoord[4] : TEXCOORD;
+static const uint texcoord1 = 10;   // See X_D3DFVF_TEX1     / X_D3DVSDE_TEXCOORD1
+static const uint texcoord2 = 11;   // See X_D3DFVF_TEX2     / X_D3DVSDE_TEXCOORD2
+static const uint texcoord3 = 12;   // See X_D3DFVF_TEX3     / X_D3DVSDE_TEXCOORD3
+static const uint reserved = 13;    // Has no X_D3DFVF_* ! Reaches up to 15
 
 // Output registers
 struct VS_OUTPUT
@@ -357,7 +361,7 @@ float DoFog()
 */
 }
 
-float4 DoTexCoord(int stage, float4 texCoords[4])
+float4 DoTexCoord(int stage, VS_INPUT xIn)
 {
     // Texture transform flags
     // https://docs.microsoft.com/en-gb/windows/win32/direct3d9/d3dtexturetransformflags
@@ -390,8 +394,8 @@ float4 DoTexCoord(int stage, float4 texCoords[4])
     if (tState.TexCoordIndexGen == TCI_PASSTHRU)
     {
         // Get from vertex data
-        int texCoordIndex = tState.TexCoordIndex;
-        texCoord = texCoords[texCoordIndex];
+        uint texCoordIndex = abs(tState.TexCoordIndex); // Note : abs() avoids error X3548 : in vs_3_0 uints can only be used with known - positive values, use int if possible
+        texCoord = xIn.v[texcoord0+texCoordIndex];
     }
     else
     {   
@@ -433,33 +437,59 @@ float4 DoTexCoord(int stage, float4 texCoords[4])
     return transformedCoords;
 }
 
-VS_OUTPUT main(VS_INPUT xIn)
+VS_INPUT DoGetInputRegisterOverrides(VS_INPUT xInput)
 {
-	VS_OUTPUT xOut;
+    VS_INPUT xIn;
 
 	// Unpack 16 flags from 4 float4 constant registers
     float vRegisterDefaultFlags[16] = (float[16]) vRegisterDefaultFlagsPacked;
 
+    // Initialize input registers from the vertex buffer data
+    // Or use the register's default value (which can be changed by the title)
+#if 1 // This compiles in Visual Studio (but not when all uncommented!?) :
+    xIn = xInput;
+    if (vRegisterDefaultFlags[0]) xIn.v[position] = vRegisterDefaultValues[0];
+    if (vRegisterDefaultFlags[1]) xIn.v[weight] = vRegisterDefaultValues[1];
+    //if (vRegisterDefaultFlags[2]) xIn.v[normal] = vRegisterDefaultValues[2];
+    if (vRegisterDefaultFlags[3]) xIn.v[diffuse] = vRegisterDefaultValues[3];
+    if (vRegisterDefaultFlags[4]) xIn.v[specular] = vRegisterDefaultValues[4];
+    // if (vRegisterDefaultFlags[5]) xIn.v[fogCoord] = vRegisterDefaultValues[5];
+    if (vRegisterDefaultFlags[7]) xIn.v[backDiffuse] = vRegisterDefaultValues[7];
+    //if (vRegisterDefaultFlags[8]) xIn.v[backSpecular] = vRegisterDefaultValues[8];
+    if (vRegisterDefaultFlags[9]) xIn.v[texcoord0] = vRegisterDefaultValues[9];
+    if (vRegisterDefaultFlags[10]) xIn.v[texcoord1] = vRegisterDefaultValues[10];
+    if (vRegisterDefaultFlags[11]) xIn.v[texcoord2] = vRegisterDefaultValues[11];
+    //if (vRegisterDefaultFlags[12]) xIn.v[texcoord3] = vRegisterDefaultValues[12];
+#endif
+#if 0 // TODO : This we want (but causes a "temp registers exceeded" compile error in Visual Studio) :
+    for (uint i = 0; i < 16; i++) {
+        xIn.v[i] = lerp(xInput.v[i], vRegisterDefaultValues[i], vRegisterDefaultFlags[i]);
+    }
+#endif
+#if 0 // Note : This unrolled code appears in CxbxVertexShaderTemplate.hlsl :
+#define init_v(i) xIn.v[i] = lerp(xInput.v[i], vRegisterDefaultValues[i], vRegisterDefaultFlags[i]);
+    init_v(0); init_v(1); init_v(2); init_v(3);
+    init_v(4); init_v(5); init_v(6); init_v(7);
+    init_v(8); init_v(9); init_v(10); init_v(11);
+    init_v(12); init_v(13); init_v(14); init_v(15);
+#undef init_v()
+#endif
+    return xIn;
+}
+
+VS_OUTPUT main(VS_INPUT xInput)
+{
+    VS_OUTPUT xOut;
+
     // TODO make sure this goes fast
-    // TODO ditch semantics, use texcoord inputs
     // TODO translate FVFs to vertex declarations
     // TODO make sure register default flags are actually set properly
-    // Map default color values
-    if (vRegisterDefaultFlags[0]) xIn.pos = vRegisterDefaultValues[0];
-    if (vRegisterDefaultFlags[1]) xIn.bw = vRegisterDefaultValues[1]; // TODO : Is index 1 correct?
-    //if (vRegisterDefaultFlags[2]) xIn.normal = vRegisterDefaultValues[2];
-    if (vRegisterDefaultFlags[3]) xIn.color[0] = vRegisterDefaultValues[3];
-    if (vRegisterDefaultFlags[4]) xIn.color[1] = vRegisterDefaultValues[4];
-    // if (vRegisterDefaultFlags[5]) xIn.fog = vRegisterDefaultValues[5];
-	if (vRegisterDefaultFlags[7]) xIn.backColor[0] = vRegisterDefaultValues[7];
-	//if (vRegisterDefaultFlags[8]) xIn.backColor[1] = vRegisterDefaultValues[8];
-	if (vRegisterDefaultFlags[9]) xIn.texcoord[0] = vRegisterDefaultValues[9];
-	if (vRegisterDefaultFlags[10]) xIn.texcoord[1] = vRegisterDefaultValues[10];
-    if (vRegisterDefaultFlags[11]) xIn.texcoord[2] = vRegisterDefaultValues[11];
-	//if (vRegisterDefaultFlags[12]) xIn.texcoord[3] = vRegisterDefaultValues[12];
+
+    // Map default values
+    VS_INPUT xIn = DoGetInputRegisterOverrides(xInput);
 
     // World transform with vertex blending
-    World = DoWorldTransform(xIn.pos, xIn.normal.xyz, xIn.bw);
+    World = DoWorldTransform(xIn.v[position], xIn.v[normal].xyz, xIn.v[weight]);
 
     // View transform
     View.Position = mul(World.Position, state.Transforms.View);
@@ -479,8 +509,8 @@ VS_OUTPUT main(VS_INPUT xIn)
     if (state.Modes.Lighting || state.Modes.TwoSidedLighting)
     {
         // Materials
-        Material material = DoMaterial(0, xIn.color[0], xIn.color[1]);
-        Material backMaterial = DoMaterial(1, xIn.backColor[0], xIn.backColor[1]);
+        Material material = DoMaterial(0, xIn.v[diffuse], xIn.v[specular]);
+        Material backMaterial = DoMaterial(1, xIn.v[backDiffuse], xIn.v[backSpecular]);
         
         float2 powers = float2(material.Power, backMaterial.Power);
 
@@ -512,14 +542,14 @@ VS_OUTPUT main(VS_INPUT xIn)
     // Use default values. Materials aren't used
     if (!state.Modes.Lighting)
     {
-        xOut.oD0 = state.Modes.ColorVertex ? xIn.color[0] : float4(1, 1, 1, 1);
-        xOut.oD1 = state.Modes.ColorVertex ? xIn.color[1] : float4(0, 0, 0, 0);
+        xOut.oD0 = state.Modes.ColorVertex ? xIn.v[diffuse] : float4(1, 1, 1, 1);
+        xOut.oD1 = state.Modes.ColorVertex ? xIn.v[specular] : float4(0, 0, 0, 0);
     }
 
     if(!state.Modes.TwoSidedLighting)
     {
-        xOut.oB0 = state.Modes.ColorVertex ? xIn.backColor[0] : float4(1, 1, 1, 1);
-        xOut.oB1 = state.Modes.ColorVertex ? xIn.backColor[1] : float4(0, 0, 0, 0);
+        xOut.oB0 = state.Modes.ColorVertex ? xIn.v[backDiffuse] : float4(1, 1, 1, 1);
+        xOut.oB1 = state.Modes.ColorVertex ? xIn.v[backSpecular] : float4(0, 0, 0, 0);
     }
 
     xOut.oD0 = saturate(xOut.oD0);
@@ -536,10 +566,10 @@ VS_OUTPUT main(VS_INPUT xIn)
     // xOut.oD0 = float4(world.Normal, 1);
 
 	// TODO reverse scaling for linear textures
-    xOut.oT0 = DoTexCoord(0, xIn.texcoord);
-    xOut.oT1 = DoTexCoord(1, xIn.texcoord);
-    xOut.oT2 = DoTexCoord(2, xIn.texcoord);
-    xOut.oT3 = DoTexCoord(3, xIn.texcoord);
+    xOut.oT0 = DoTexCoord(0, xIn);
+    xOut.oT1 = DoTexCoord(1, xIn);
+    xOut.oT2 = DoTexCoord(2, xIn);
+    xOut.oT3 = DoTexCoord(3, xIn);
 
 	return xOut;
 }
