@@ -172,3 +172,13 @@ set(CXBXR_GLEW_DLL "${CXBXR_ROOT_DIR}/import/glew-2.0.0/bin/Release/Win32/glew32
 add_custom_command(TARGET cxbxr-emu POST_BUILD
  COMMAND ${CMAKE_COMMAND} -E copy ${CXBXR_GLEW_DLL} $<TARGET_FILE_DIR:cxbxr-emu>
 )
+
+# TMP vertex shader compilation
+set_source_files_properties(
+  "${CXBXR_ROOT_DIR}/src/core/hle/D3D8/Direct3D9/CxbxVertexShaderFvf.hlsl" PROPERTIES 
+  VS_SHADER_MODEL "3.0"
+  VS_SHADER_TYPE "Vertex"
+  VS_SHADER_OUTPUT_HEADER_FILE "${CXBXR_ROOT_DIR}/src/core/hle/D3D8/Direct3D9/CxbxVertexShaderFvf.h"
+  VS_SHADER_FLAGS /O3
+  VS_SHADER_ENABLE_DEBUG true
+)
