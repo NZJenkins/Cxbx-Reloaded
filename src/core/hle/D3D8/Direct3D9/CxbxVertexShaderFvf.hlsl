@@ -12,11 +12,21 @@ uniform float4 vRegisterDefaultFlagsPacked[4] : register(c208); // Matches CXBX_
 
 uniform RenderStateBlock state : register(c214); // Matches CXBX_D3DVS_FIXEDFUNCSTATE_BASE
 
+#define CXBX_ALL_TEXCOORD_INPUTS // disable to return to semantics (doesn't yet compile)
 
 // Input registers
 struct VS_INPUT
 {
+#ifdef CXBX_ALL_TEXCOORD_INPUTS
 	float4 v[16] : TEXCOORD;
+#else
+	float4 pos : POSITION;
+	float4 bw : BLENDWEIGHT;
+	float4 color[2] : COLOR;
+	float4 backColor[2] : TEXCOORD4;
+	float4 normal : NORMAL;
+	float4 texcoord[4] : TEXCOORD;
+#endif
 };
 
 // Input register indices (also known as attributes, as given in VS_INPUT.v array)
@@ -43,7 +53,29 @@ static const uint reserved2 = 15;   // Has no X_D3DFVF_*     / X_D3DVSDE_*
 
 inline float4 Get(const VS_INPUT xIn, const uint index)
 {
+#ifdef CXBX_ALL_TEXCOORD_INPUTS
 	return xIn.v[index];
+#else
+    switch (index) {
+        case position: return xIn.pos;
+        case weight: return xIn.bw;
+        case normal: return xIn.normal;
+        case diffuse: return xIn.color[0];
+        case specular: return xIn.color[1];
+        case fogCoord: return 0;
+        case pointSize: return 0;
+        case backDiffuse: return xIn.backColor[0];
+        case backSpecular: return xIn.backColor[1];
+        case texcoord0: return xIn.texcoord[0];
+        case texcoord1: return xIn.texcoord[1];
+        case texcoord2: return xIn.texcoord[2];
+        case texcoord3: return xIn.texcoord[3];
+        case reserved0: return 0;
+        case reserved1: return 0;
+        case reserved2: return 0;
+    default: return 0;
+    }
+#endif
 }
 
 // Output registers
@@ -455,7 +487,30 @@ VS_INPUT DoGetInputRegisterOverrides(VS_INPUT xInput)
     // Initialize input registers from the vertex buffer data
     // Or use the register's default value (which can be changed by the title)
     for (uint i = 0; i < 16; i++) {
-        xIn.v[i] = lerp(Get(xInput, i), vRegisterDefaultValues[i], vRegisterDefaultFlags[i]);
+        float4 value = lerp(Get(xInput, i), vRegisterDefaultValues[i], vRegisterDefaultFlags[i]);
+#ifdef CXBX_ALL_TEXCOORD_INPUTS
+        xIn.v[i] = value;
+#else
+        switch (i) {
+            case position: xIn.pos = value; break;
+            case weight: xIn.bw = value; break;
+            case normal: xIn.normal = value; break;
+            case diffuse: xIn.color[0] = value; break;
+            case specular: xIn.color[1] = value; break;
+            case fogCoord: break;
+            case pointSize: break;
+            case backDiffuse: xIn.backColor[0] = value; break;
+            case backSpecular: xIn.backColor[1] = value; break;
+            case texcoord0: xIn.texcoord[0] = value; break;
+            case texcoord1: xIn.texcoord[1] = value; break;
+            case texcoord2: xIn.texcoord[2] = value; break;
+            case texcoord3: xIn.texcoord[3] = value; break;
+            case reserved0: break;
+            case reserved1: break;
+            case reserved2: break;
+        default: break;
+        }
+#endif
     }
 
     return xIn;
