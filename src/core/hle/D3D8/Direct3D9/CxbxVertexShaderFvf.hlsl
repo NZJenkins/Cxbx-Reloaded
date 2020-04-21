@@ -12,7 +12,7 @@ uniform float4 vRegisterDefaultFlagsPacked[4] : register(c208); // Matches CXBX_
 
 uniform RenderStateBlock state : register(c214); // Matches CXBX_D3DVS_FIXEDFUNCSTATE_BASE
 
-#define CXBX_ALL_TEXCOORD_INPUTS // disable to return to semantics (doesn't yet compile)
+#undef CXBX_ALL_TEXCOORD_INPUTS // Enable this to disable semantics in VS_INPUT (instead, we'll use an array of generic TEXCOORD's)
 
 // Input registers
 struct VS_INPUT
@@ -62,18 +62,18 @@ inline float4 Get(const VS_INPUT xIn, const uint index)
         case normal: return xIn.normal;
         case diffuse: return xIn.color[0];
         case specular: return xIn.color[1];
-        case fogCoord: return 0;
-        case pointSize: return 0;
+        case fogCoord: return 1;
+        case pointSize: return 1;
         case backDiffuse: return xIn.backColor[0];
         case backSpecular: return xIn.backColor[1];
         case texcoord0: return xIn.texcoord[0];
         case texcoord1: return xIn.texcoord[1];
         case texcoord2: return xIn.texcoord[2];
         case texcoord3: return xIn.texcoord[3];
-        case reserved0: return 0;
-        case reserved1: return 0;
-        case reserved2: return 0;
-    default: return 0;
+        case reserved0: return 1;
+        case reserved1: return 1;
+        case reserved2: return 1;
+    default: return 1;
     }
 #endif
 }
