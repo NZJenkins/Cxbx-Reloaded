@@ -41,6 +41,11 @@ static const uint reserved0 = 13;   // Has no X_D3DFVF_*     / X_D3DVSDE_*
 static const uint reserved1 = 14;   // Has no X_D3DFVF_*     / X_D3DVSDE_*
 static const uint reserved2 = 15;   // Has no X_D3DFVF_*     / X_D3DVSDE_*
 
+inline float4 Get(const VS_INPUT xIn, const uint index)
+{
+	return xIn.v[index];
+}
+
 // Output registers
 struct VS_OUTPUT
 {
@@ -398,7 +403,7 @@ float4 DoTexCoord(int stage, VS_INPUT xIn)
     {
         // Get from vertex data
         uint texCoordIndex = abs(tState.TexCoordIndex); // Note : abs() avoids error X3548 : in vs_3_0 uints can only be used with known - positive values, use int if possible
-        texCoord = xIn.v[texcoord0+texCoordIndex];
+        texCoord = Get(xIn, texcoord0+texCoordIndex);
     }
     else
     {   
@@ -450,7 +455,7 @@ VS_INPUT DoGetInputRegisterOverrides(VS_INPUT xInput)
     // Initialize input registers from the vertex buffer data
     // Or use the register's default value (which can be changed by the title)
     for (uint i = 0; i < 16; i++) {
-        xIn.v[i] = lerp(xInput.v[i], vRegisterDefaultValues[i], vRegisterDefaultFlags[i]);
+        xIn.v[i] = lerp(Get(xInput, i), vRegisterDefaultValues[i], vRegisterDefaultFlags[i]);
     }
 
     return xIn;
@@ -468,7 +473,7 @@ VS_OUTPUT main(VS_INPUT xInput)
     VS_INPUT xIn = DoGetInputRegisterOverrides(xInput);
 
     // World transform with vertex blending
-    World = DoWorldTransform(xIn.v[position], xIn.v[normal].xyz, xIn.v[weight]);
+    World = DoWorldTransform(Get(xIn, position), Get(xIn, normal).xyz, Get(xIn, weight));
 
     // View transform
     View.Position = mul(World.Position, state.Transforms.View);
@@ -488,8 +493,8 @@ VS_OUTPUT main(VS_INPUT xInput)
     if (state.Modes.Lighting || state.Modes.TwoSidedLighting)
     {
         // Materials
-        Material material = DoMaterial(0, xIn.v[diffuse], xIn.v[specular]);
-        Material backMaterial = DoMaterial(1, xIn.v[backDiffuse], xIn.v[backSpecular]);
+        Material material = DoMaterial(0, Get(xIn, diffuse), Get(xIn, specular));
+        Material backMaterial = DoMaterial(1, Get(xIn, backDiffuse), Get(xIn, backSpecular));
         
         float2 powers = float2(material.Power, backMaterial.Power);
 
@@ -521,14 +526,14 @@ VS_OUTPUT main(VS_INPUT xInput)
     // Use default values. Materials aren't used
     if (!state.Modes.Lighting)
     {
-        xOut.oD0 = state.Modes.ColorVertex ? xIn.v[diffuse] : float4(1, 1, 1, 1);
-        xOut.oD1 = state.Modes.ColorVertex ? xIn.v[specular] : float4(0, 0, 0, 0);
+        xOut.oD0 = state.Modes.ColorVertex ? Get(xIn, diffuse) : float4(1, 1, 1, 1);
+        xOut.oD1 = state.Modes.ColorVertex ? Get(xIn, specular) : float4(0, 0, 0, 0);
     }
 
     if(!state.Modes.TwoSidedLighting)
     {
-        xOut.oB0 = state.Modes.ColorVertex ? xIn.v[backDiffuse] : float4(1, 1, 1, 1);
-        xOut.oB1 = state.Modes.ColorVertex ? xIn.v[backSpecular] : float4(0, 0, 0, 0);
+        xOut.oB0 = state.Modes.ColorVertex ? Get(xIn, backDiffuse) : float4(1, 1, 1, 1);
+        xOut.oB1 = state.Modes.ColorVertex ? Get(xIn, backSpecular) : float4(0, 0, 0, 0);
     }
 
     xOut.oD0 = saturate(xOut.oD0);
