@@ -1,6 +1,7 @@
 #include "RenderStateBlock.cpp"
 
 // todo rename Fvf => FixedFunc
+// Note : Avoid "temp registers exceeded" compile error (in Visual Studio 2019) requires /O3 xfc command line option
 
 // Default values for vertex registers, and whether to use them
 uniform float4 vRegisterDefaultValues[16] : register(c192); // Matches CXBX_D3DVS_ATTRDATA_BASE
@@ -448,34 +449,10 @@ VS_INPUT DoGetInputRegisterOverrides(VS_INPUT xInput)
 
     // Initialize input registers from the vertex buffer data
     // Or use the register's default value (which can be changed by the title)
-#if 1 // This compiles in Visual Studio (but not when all uncommented!?) :
-    xIn = xInput;
-    if (vRegisterDefaultFlags[0]) xIn.v[position] = vRegisterDefaultValues[0];
-    if (vRegisterDefaultFlags[1]) xIn.v[weight] = vRegisterDefaultValues[1];
-    //if (vRegisterDefaultFlags[2]) xIn.v[normal] = vRegisterDefaultValues[2];
-    if (vRegisterDefaultFlags[3]) xIn.v[diffuse] = vRegisterDefaultValues[3];
-    if (vRegisterDefaultFlags[4]) xIn.v[specular] = vRegisterDefaultValues[4];
-    // if (vRegisterDefaultFlags[5]) xIn.v[fogCoord] = vRegisterDefaultValues[5];
-    if (vRegisterDefaultFlags[7]) xIn.v[backDiffuse] = vRegisterDefaultValues[7];
-    //if (vRegisterDefaultFlags[8]) xIn.v[backSpecular] = vRegisterDefaultValues[8];
-    if (vRegisterDefaultFlags[9]) xIn.v[texcoord0] = vRegisterDefaultValues[9];
-    if (vRegisterDefaultFlags[10]) xIn.v[texcoord1] = vRegisterDefaultValues[10];
-    if (vRegisterDefaultFlags[11]) xIn.v[texcoord2] = vRegisterDefaultValues[11];
-    //if (vRegisterDefaultFlags[12]) xIn.v[texcoord3] = vRegisterDefaultValues[12];
-#endif
-#if 0 // TODO : This we want (but causes a "temp registers exceeded" compile error in Visual Studio) :
     for (uint i = 0; i < 16; i++) {
         xIn.v[i] = lerp(xInput.v[i], vRegisterDefaultValues[i], vRegisterDefaultFlags[i]);
     }
-#endif
-#if 0 // Note : This unrolled code appears in CxbxVertexShaderTemplate.hlsl :
-#define init_v(i) xIn.v[i] = lerp(xInput.v[i], vRegisterDefaultValues[i], vRegisterDefaultFlags[i]);
-    init_v(0); init_v(1); init_v(2); init_v(3);
-    init_v(4); init_v(5); init_v(6); init_v(7);
-    init_v(8); init_v(9); init_v(10); init_v(11);
-    init_v(12); init_v(13); init_v(14); init_v(15);
-#undef init_v()
-#endif
+
     return xIn;
 }
 
