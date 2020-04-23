@@ -62,18 +62,18 @@ inline float4 Get(const VS_INPUT xIn, const uint index)
         case normal: return xIn.normal;
         case diffuse: return xIn.color[0];
         case specular: return xIn.color[1];
-        case fogCoord: return 1;
-        case pointSize: return 1;
+        case fogCoord: return 1.f;
+        case pointSize: return 1.f;
         case backDiffuse: return xIn.backColor[0];
         case backSpecular: return xIn.backColor[1];
         case texcoord0: return xIn.texcoord[0];
         case texcoord1: return xIn.texcoord[1];
         case texcoord2: return xIn.texcoord[2];
         case texcoord3: return xIn.texcoord[3];
-        case reserved0: return 1;
-        case reserved1: return 1;
-        case reserved2: return 1;
-    default: return 1;
+        case reserved0: return 1.f;
+        case reserved1: return 1.f;
+        case reserved2: return 1.f;
+    default: return 1.f;
     }
 #endif
 }
@@ -118,10 +118,10 @@ struct LightingOutput
     LightingInfo Specular;
 };
 
-LightingInfo DoSpecular(float3 lightDirWorld, float3 toViewerView, float2 powers, float4 lightSpecular)
+LightingInfo DoSpecular(const float3 lightDirWorld, const float3 toViewerView, const float2 powers, const float4 lightSpecular)
 {
     LightingInfo o;
-    o.Front = o.Back = float3(0, 0, 0);
+    o.Front = o.Back = float3(0.f, 0.f, 0.f);
     
     // Specular
     if (state.Modes.SpecularEnable)
@@ -135,7 +135,7 @@ LightingInfo DoSpecular(float3 lightDirWorld, float3 toViewerView, float2 powers
         float3 frontSpecular = pow(abs(NdotH), powers[0]) * lightSpecular.rgb;
         float3 backSpecular = pow(abs(NdotH), powers[1]) * lightSpecular.rgb;
         
-        if (NdotH >= 0)
+        if (NdotH >= 0.f)
             o.Front = frontSpecular;
         else
             o.Back = backSpecular;
@@ -146,11 +146,11 @@ LightingInfo DoSpecular(float3 lightDirWorld, float3 toViewerView, float2 powers
 
 // useful reference https://drivers.amd.com/misc/samples/dx9/FixedFuncShader.pdf
 
-LightingOutput DoPointLight(Light l, float3 toViewerView, float2 powers)
+LightingOutput DoPointLight(const Light l, const float3 toViewerView, const float2 powers)
 {
     LightingOutput o;
-    o.Diffuse.Front = o.Diffuse.Back = float3(0, 0, 0);
-    o.Specular.Front = o.Specular.Back = float3(0, 0, 0);
+    o.Diffuse.Front = o.Diffuse.Back = float3(0.f, 0.f, 0.f);
+    o.Specular.Front = o.Specular.Back = float3(0.f, 0.f, 0.f);
 
     // Diffuse
     float3 toVertexWorld = World.Position.xyz - l.Position;
@@ -159,13 +159,13 @@ LightingOutput DoPointLight(Light l, float3 toViewerView, float2 powers)
 
     // A(Constant) + A(Linear) * dist + A(Exp) * dist^2
     float attenuation =
-        1 / (l.Attenuation[0]
+        1.f / (l.Attenuation[0]
         + l.Attenuation[1] * lightDist
         + l.Attenuation[2] * lightDist * lightDist);
 
     // Range cutoff
     if (lightDist > l.Range)
-        attenuation = 0;
+        attenuation = 0.f;
 
     float NdotL = dot(World.Normal, lightDirWorld);
     float3 lightDiffuse = abs(NdotL) * attenuation * l.Diffuse.rgb;
@@ -183,11 +183,11 @@ LightingOutput DoPointLight(Light l, float3 toViewerView, float2 powers)
     return o;
 }
 
-LightingOutput DoSpotLight(Light l, float3 toViewerView, float2 powers)
+LightingOutput DoSpotLight(const Light l, const float3 toViewerView, const float2 powers)
 {
     LightingOutput o;
-    o.Diffuse.Front = o.Diffuse.Back = float3(0, 0, 0);
-    o.Specular.Front = o.Specular.Back = float3(0, 0, 0);
+    o.Diffuse.Front = o.Diffuse.Back = float3(0.f, 0.f, 0.f);
+    o.Specular.Front = o.Specular.Back = float3(0.f, 0.f, 0.f);
 
     // Diffuse
     float3 toVertexWorld = World.Position.xyz - l.Position;
@@ -203,13 +203,13 @@ LightingOutput DoSpotLight(Light l, float3 toViewerView, float2 powers)
 
     // A(Constant) + A(Linear) * dist + A(Exp) * dist^2
     float attenuation =
-        1 / (l.Attenuation[0]
+        1.f / (l.Attenuation[0]
         + l.Attenuation[1] * lightDist
         + l.Attenuation[2] * lightDist * lightDist);
 
     // Range cutoff
     if (lightDist > l.Range)
-        attenuation = 0;
+        attenuation = 0.f;
 
     float NdotL = dot(World.Normal, lightDirWorld);
     float3 lightDiffuse = abs(NdotL) * attenuation * l.Diffuse.rgb * spotIntensity;
@@ -227,11 +227,11 @@ LightingOutput DoSpotLight(Light l, float3 toViewerView, float2 powers)
     return o;
 }
 
-LightingOutput DoDirectionalLight(Light l, float3 toViewerView, float2 powers)
+LightingOutput DoDirectionalLight(const Light l, const float3 toViewerView, const float2 powers)
 {
     LightingOutput o;
-    o.Diffuse.Front = o.Diffuse.Back = float3(0, 0, 0);
-    o.Specular.Front = o.Specular.Back = float3(0, 0, 0);
+    o.Diffuse.Front = o.Diffuse.Back = float3(0.f, 0.f, 0.f);
+    o.Specular.Front = o.Specular.Back = float3(0.f, 0.f, 0.f);
 
     // Diffuse
 
@@ -242,7 +242,7 @@ LightingOutput DoDirectionalLight(Light l, float3 toViewerView, float2 powers)
 
     // Apply light contribution to front or back face
     // as the case may be
-    if (NdotL >= 0)
+    if (NdotL >= 0.f)
         o.Diffuse.Front = lightDiffuse;
     else
         o.Diffuse.Back = lightDiffuse;
@@ -254,7 +254,7 @@ LightingOutput DoDirectionalLight(Light l, float3 toViewerView, float2 powers)
 }
 
 
-LightingOutput CalcLighting(float2 powers)
+LightingOutput CalcLighting(const float2 powers)
 {
     const int LIGHT_TYPE_NONE        = 0;
     const int LIGHT_TYPE_POINT       = 1;
@@ -262,12 +262,12 @@ LightingOutput CalcLighting(float2 powers)
     const int LIGHT_TYPE_DIRECTIONAL = 3;
 
     LightingOutput totalLightOutput;
-    totalLightOutput.Diffuse.Front = float3(0, 0, 0);
-    totalLightOutput.Diffuse.Back = float3(0, 0, 0);
-    totalLightOutput.Specular.Front = float3(0, 0, 0);
-    totalLightOutput.Specular.Back = float3(0, 0, 0);
+    totalLightOutput.Diffuse.Front = float3(0.f, 0.f, 0.f);
+    totalLightOutput.Diffuse.Back = float3(0.f, 0.f, 0.f);
+    totalLightOutput.Specular.Front = float3(0.f, 0.f, 0.f);
+    totalLightOutput.Specular.Back = float3(0.f, 0.f, 0.f);
 
-    float3 toViewerView = float3(0, 0, 1);
+    float3 toViewerView = float3(0.f, 0.f, 1.f);
     if (state.Modes.LocalViewer)
         toViewerView = normalize(-View.Position.xyz);
     
@@ -294,11 +294,11 @@ LightingOutput CalcLighting(float2 powers)
     return totalLightOutput;
 }
 
-TransformInfo DoWorldTransform(float4 position, float3 normal, float4 blendWeights)
+TransformInfo DoWorldTransform(const float4 position, const float3 normal, const float4 blendWeights)
 {
     TransformInfo output;
-    output.Position = float4(0, 0, 0, 0);
-    output.Normal = float3(0, 0, 0);
+    output.Position = float4(0.f, 0.f, 0.f, 0);
+    output.Normal = float3(0.f, 0.f, 0.f);
 
     // D3D
     const int _BLEND_OFF = 0;
@@ -317,11 +317,11 @@ TransformInfo DoWorldTransform(float4 position, float3 normal, float4 blendWeigh
     }
     
     // The number of matrices to blend
-    int mats = floor((state.Modes.VertexBlend - 1) / 2 + 2);
+    int mats = floor((state.Modes.VertexBlend - 1.f) / 2.f + 2.f);
     // If we have to calculate the last blend value
-    bool calcLastBlend = fmod(state.Modes.VertexBlend, 2) == 1;
+    bool calcLastBlend = fmod(state.Modes.VertexBlend, 2.f) == 1.f;
 
-    float lastBlend = 1;
+    float lastBlend = 1.f;
     for (int i = 0; i < mats - 1; i++)
     {
         output.Position += mul(position, state.Transforms.World[i]) * blendWeights[i];
@@ -343,7 +343,7 @@ TransformInfo DoWorldTransform(float4 position, float3 normal, float4 blendWeigh
     return output;
 }
 
-Material DoMaterial(int index, float4 color0, float4 color1)
+Material DoMaterial(const uint index, const float4 color0, const float4 color1)
 {
     Material stateMat = state.Materials[index];
 
@@ -407,7 +407,7 @@ float DoFog()
 
     // Early exit if fog is disabled
     //if (!state.Fog.Enable || state.Fog.TableMode == D3DFOG_NONE)
-    //    return 0;
+    //    return 0.f;
 
     // We just need to output the depth in oFog (?)
     // Is vertex fog activated by RangeFogEnable?
@@ -421,22 +421,22 @@ float DoFog()
 
     if (state.Fog.TableMode == D3DFOG_EXP)
     {
-        return 1 / exp(density * depth);
+        return 1.f / exp(density * depth);
     }
     else if (state.Fog.TableMode == D3DFOG_EXP2)
     {
-        return 1 / exp(pow(density * depth, 2));
+        return 1.f / exp(pow(density * depth, 2.f));
     }
     else if (state.Fog.TableMode == D3DFOG_LINEAR)
     {
         return saturate((fogEnd - depth) / (fogEnd - fogStart));
     }
 
-    return 0;
+    return 0.f;
 */
 }
 
-float4 DoTexCoord(int stage, VS_INPUT xIn)
+float4 DoTexCoord(const uint stage, const VS_INPUT xIn)
 {
     // Texture transform flags
     // https://docs.microsoft.com/en-gb/windows/win32/direct3d9/d3dtexturetransformflags
@@ -465,7 +465,7 @@ float4 DoTexCoord(int stage, VS_INPUT xIn)
     // Get texture coordinates
     // Coordinates are either from the vertex texcoord data
     // Or generated
-    float4 texCoord = float4(0, 0, 0, 0);
+    float4 texCoord = float4(0.f, 0.f, 0.f, 0);
     if (tState.TexCoordIndexGen == TCI_PASSTHRU)
     {
         // Get from vertex data
@@ -489,9 +489,9 @@ float4 DoTexCoord(int stage, VS_INPUT xIn)
             // TODO verify
             // http://www.bluevoid.com/opengl/sig99/advanced99/notes/node177.html
             float3 R = reflected;
-            float p = sqrt(pow(R.x, 2) + pow(R.y, 2) + pow(R.z + 1, 2));
-            texCoord.x = R.x / 2 * p + 0.5;
-            texCoord.y = R.y / 2 * p + 0.5;
+            float p = sqrt(pow(R.x, 2.f) + pow(R.y, 2.f) + pow(R.z + 1.f, 2.f));
+            texCoord.x = R.x / 2.f * p + 0.5f;
+            texCoord.y = R.y / 2.f * p + 0.5f;
         }
     }
 
@@ -512,7 +512,7 @@ float4 DoTexCoord(int stage, VS_INPUT xIn)
     return transformedCoords;
 }
 
-VS_INPUT DoGetInputRegisterOverrides(VS_INPUT xInput)
+VS_INPUT DoGetInputRegisterOverrides(const VS_INPUT xInput)
 {
     VS_INPUT xIn;
 
@@ -551,7 +551,7 @@ VS_INPUT DoGetInputRegisterOverrides(VS_INPUT xInput)
     return xIn;
 }
 
-VS_OUTPUT main(VS_INPUT xInput)
+VS_OUTPUT main(const VS_INPUT xInput)
 {
     VS_OUTPUT xOut;
 
@@ -605,10 +605,10 @@ VS_OUTPUT main(VS_INPUT xInput)
 
         // Frontface
         xOut.oD0 = float4(ambient + diffuse + emissive, material.Diffuse.a);
-        xOut.oD1 = float4(specular, 0);
+        xOut.oD1 = float4(specular, 0.f);
         // Backface
         xOut.oB0 = float4(backAmbient + backDiffuse + backEmissive, backMaterial.Diffuse.a);
-        xOut.oB1 = float4(backSpecular, 0);
+        xOut.oB1 = float4(backSpecular, 0.f);
     }
 
     // TODO verify if TwoSidedLighting can be enabled independently of Lighting
@@ -616,14 +616,14 @@ VS_OUTPUT main(VS_INPUT xInput)
     // Use default values. Materials aren't used
     if (!state.Modes.Lighting)
     {
-        xOut.oD0 = state.Modes.ColorVertex ? Get(xIn, diffuse) : float4(1, 1, 1, 1);
-        xOut.oD1 = state.Modes.ColorVertex ? Get(xIn, specular) : float4(0, 0, 0, 0);
+        xOut.oD0 = state.Modes.ColorVertex ? Get(xIn, diffuse) : float4(1.f, 1.f, 1.f, 1.f);
+        xOut.oD1 = state.Modes.ColorVertex ? Get(xIn, specular) : float4(0.f, 0.f, 0.f, 0.f);
     }
 
     if(!state.Modes.TwoSidedLighting)
     {
-        xOut.oB0 = state.Modes.ColorVertex ? Get(xIn, backDiffuse) : float4(1, 1, 1, 1);
-        xOut.oB1 = state.Modes.ColorVertex ? Get(xIn, backSpecular) : float4(0, 0, 0, 0);
+        xOut.oB0 = state.Modes.ColorVertex ? Get(xIn, backDiffuse) : float4(1.f, 1.f, 1.f, 1.f);
+        xOut.oB1 = state.Modes.ColorVertex ? Get(xIn, backSpecular) : float4(0.f, 0.f, 0.f, 0.f);
     }
 
     xOut.oD0 = saturate(xOut.oD0);
@@ -636,9 +636,9 @@ VS_OUTPUT main(VS_INPUT xInput)
 
     // TODO Point size for Point Sprites
     // https://docs.microsoft.com/en-us/windows/win32/direct3d9/point-sprites
-	xOut.oPts = 0;
+	xOut.oPts = 0.f;
 
-    // xOut.oD0 = float4(world.Normal, 1);
+    // xOut.oD0 = float4(world.Normal, 1.f);
 
 	// TODO reverse scaling for linear textures
     xOut.oT0 = DoTexCoord(0, xIn);
