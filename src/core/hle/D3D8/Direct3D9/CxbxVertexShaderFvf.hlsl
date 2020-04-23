@@ -155,9 +155,9 @@ LightingOutput DoPointLight(Light l, float3 toViewerView, float2 powers)
     o.Specular.Front = o.Specular.Back = float3(0, 0, 0);
 
     // Diffuse
-    float3 toLightWorld = World.Position.xyz - l.Position;
-    float3 lightDirWorld = normalize(toLightWorld);
-    float lightDist = length(toLightWorld);
+    float3 toVertexWorld = World.Position.xyz - l.Position;
+    float3 lightDirWorld = normalize(toVertexWorld);
+    float lightDist = length(toVertexWorld);
 
     // A(Constant) + A(Linear) * dist + A(Exp) * dist^2
     float attenuation =
@@ -167,7 +167,7 @@ LightingOutput DoPointLight(Light l, float3 toViewerView, float2 powers)
 
     // Range cutoff
     if (lightDist > l.Range)
-        return attenuation = 0;
+        attenuation = 0;
 
     float NdotL = dot(World.Normal, lightDirWorld);
     float3 lightDiffuse = abs(NdotL * attenuation) * l.Diffuse.rgb;
@@ -187,11 +187,44 @@ LightingOutput DoPointLight(Light l, float3 toViewerView, float2 powers)
 
 LightingOutput DoSpotLight(Light l, float3 toViewerView, float2 powers)
 {
-	LightingOutput o;
-	o.Ambient = l.Ambient.rgb;
-	o.Diffuse.Front = o.Diffuse.Back = float3(0, 0, 0);
-	o.Specular.Front = o.Specular.Back = float3(0, 0, 0);
-	return o;
+    LightingOutput o;
+    o.Ambient = l.Ambient.rgb; // FIXME Precompute light ambient
+    o.Diffuse.Front = o.Diffuse.Back = float3(0, 0, 0);
+    o.Specular.Front = o.Specular.Back = float3(0, 0, 0);
+
+    // Diffuse
+    float3 toVertexWorld = World.Position.xyz - l.Position;
+    float3 toVertexDirWorld = normalize(toVertexWorld);
+    float3 lightDirWorld = normalize(l.Direction);
+    float lightDist = length(toVertexWorld);
+
+    float cosAlpha = dot(lightDirWorld, toVertexDirWorld);
+    float spotIntensity = pow((cosAlpha - cos(l.Phi / 2)) / (cos(l.Theta / 2) - cos(l.Phi / 2)), l.Falloff); // Precompute terms
+
+    // A(Constant) + A(Linear) * dist + A(Exp) * dist^2
+    float attenuation =
+        1 / (l.Attenuation[0]
+        + l.Attenuation[1] * lightDist
+        + l.Attenuation[2] * lightDist * lightDist);
+
+    // Range cutoff
+    if (lightDist > l.Range)
+        attenuation = 0;
+
+    float NdotL = dot(World.Normal, lightDirWorld);
+    float3 lightDiffuse = abs(NdotL * attenuation) * l.Diffuse.rgb * spotIntensity;
+
+    if (NdotL >= 0.f)
+        o.Diffuse.Front = lightDiffuse;
+    else
+        o.Diffuse.Back = lightDiffuse;
+
+    // Specular
+    o.Specular = DoSpecular(lightDirWorld, toViewerView, powers, l.Specular);
+    o.Specular.Front *= attenuation;
+    o.Specular.Back *= attenuation;
+
+    return o;
 }
 
 LightingOutput DoDirectionalLight(Light l, float3 toViewerView, float2 powers)
