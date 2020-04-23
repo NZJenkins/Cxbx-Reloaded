@@ -364,7 +364,7 @@ Material DoMaterial(const uint index, const float4 color0, const float4 color1)
         else
             runtimeMat.Ambient = color1;
 
-        if (state.Modes.AmbientMaterialSource == SRC_MATERIAL)
+        if (state.Modes.DiffuseMaterialSource == SRC_MATERIAL)
             runtimeMat.Diffuse = stateMat.Diffuse;
         else if (state.Modes.DiffuseMaterialSource == SRC_COLOR1)
             runtimeMat.Diffuse = color0;
