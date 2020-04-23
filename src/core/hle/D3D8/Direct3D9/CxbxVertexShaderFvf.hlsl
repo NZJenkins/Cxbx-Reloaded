@@ -170,7 +170,7 @@ LightingOutput DoPointLight(Light l, float3 toViewerView, float2 powers)
         attenuation = 0;
 
     float NdotL = dot(World.Normal, lightDirWorld);
-    float3 lightDiffuse = abs(NdotL * attenuation) * l.Diffuse.rgb;
+    float3 lightDiffuse = abs(NdotL) * attenuation * l.Diffuse.rgb;
 
     if (NdotL >= 0.f)
         o.Diffuse.Front = lightDiffuse;
@@ -215,7 +215,7 @@ LightingOutput DoSpotLight(Light l, float3 toViewerView, float2 powers)
         attenuation = 0;
 
     float NdotL = dot(World.Normal, lightDirWorld);
-    float3 lightDiffuse = abs(NdotL * attenuation) * l.Diffuse.rgb * spotIntensity;
+    float3 lightDiffuse = abs(NdotL) * attenuation * l.Diffuse.rgb * spotIntensity;
 
     if (NdotL >= 0.f)
         o.Diffuse.Front = lightDiffuse;
