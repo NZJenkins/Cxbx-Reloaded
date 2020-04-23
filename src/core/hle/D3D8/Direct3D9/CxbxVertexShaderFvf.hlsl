@@ -409,11 +409,9 @@ float DoFog()
     //if (!state.Fog.Enable || state.Fog.TableMode == D3DFOG_NONE)
     //    return 0;
 
-    // We're doing some fog
-    float depth = state.Fog.RangeFogEnable ? length(View.Position.xyz) : abs(View.Position.z);
-
     // We just need to output the depth in oFog (?)
-    
+    // Is vertex fog activated by RangeFogEnable?
+    float depth = state.Fog.RangeFogEnable ? length(View.Position.xyz) : abs(View.Position.z);
     return depth;
 
     /*

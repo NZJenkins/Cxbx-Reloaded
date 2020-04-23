@@ -7337,11 +7337,11 @@ void CxbxUpdateFixedFunctionStateBlock()
 	g_renderStateBlock.Modes.BackEmissiveMaterialSource = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_BACKEMISSIVEMATERIALSOURCE);
 
 	// Fog
-	g_renderStateBlock.Fog.Enable = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_FOGENABLE);
-	g_renderStateBlock.Fog.TableMode = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_FOGTABLEMODE);
-	g_renderStateBlock.Fog.Start = AsFloat(XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_FOGSTART));
-	g_renderStateBlock.Fog.End = AsFloat(XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_FOGEND));
-	g_renderStateBlock.Fog.Density = AsFloat(XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_FOGDENSITY));
+	//g_renderStateBlock.Fog.Enable = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_FOGENABLE);
+	// g_renderStateBlock.Fog.TableMode = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_FOGTABLEMODE);
+	//g_renderStateBlock.Fog.Start = AsFloat(XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_FOGSTART));
+	//g_renderStateBlock.Fog.End = AsFloat(XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_FOGEND));
+	//g_renderStateBlock.Fog.Density = AsFloat(XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_FOGDENSITY));
 	g_renderStateBlock.Fog.RangeFogEnable = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_RANGEFOGENABLE);
 
 	// Texture things...
