@@ -7178,6 +7178,91 @@ void EmuUpdateActiveTextureStages()
 	}
 }
 
+class FakeD3DState {
+
+	D3DCOLORVALUE colorValue(float r, float g, float b, float a) {
+		auto value = D3DCOLORVALUE();
+		value.r = r;
+		value.g = g;
+		value.b = b;
+		value.a = a;
+		return value;
+	}
+
+	D3DVECTOR toVector(float x, float y, float z) {
+		auto value = D3DVECTOR();
+		value.x = x;
+		value.y = y;
+		value.z = z;
+		return value;
+	}
+
+public:
+	// Lighting
+	std::array<XTL::X_D3DLIGHT8, 4096> Lights;
+	// Keep track of the last 8 lights set
+	std::array<int, 8> EnabledLights;
+
+	FakeD3DState() {
+		// Define the default light
+		// When unset lights are enabled, they're set to the default light
+		auto defaultLight = XTL::X_D3DLIGHT8();
+		defaultLight.Type = D3DLIGHT_DIRECTIONAL;
+		defaultLight.Diffuse = colorValue(1, 1, 1, 0);
+		defaultLight.Specular = colorValue(0, 0, 0, 0);
+		defaultLight.Ambient = colorValue(0, 0, 0, 0);
+		defaultLight.Position = toVector(0, 0, 0);
+		defaultLight.Direction = toVector(0, 0, 1);
+		defaultLight.Range = 0;
+		defaultLight.Falloff = 0;
+		defaultLight.Attenuation0 = 0;
+		defaultLight.Attenuation1 = 0;
+		defaultLight.Attenuation2 = 0;
+		defaultLight.Theta = 0;
+		defaultLight.Phi = 0;
+
+		// We'll just preset every light to the default light
+		Lights.fill(defaultLight);
+		EnabledLights.fill(-1);
+	}
+
+	int EnableLight(int index, bool enable) {
+		// EnabledLights contains the index of the enabled light
+		// or -1 at the end representing free slots
+
+		// Check to see if the light is already enabled
+		// Disable it if so
+		for (size_t i = 0; i < EnabledLights.size(); i++) {
+			if (EnabledLights[i] == index) {
+				// If enabling do nothing
+				// if disabling, disable the light
+				if (!enable) {
+					// Disable this light and move to the end
+					EnabledLights[i] = -1;
+					if (i != EnabledLights.size() - 1) // make sure this isn't already the last element
+						std::rotate(std::begin(EnabledLights) + i, std::begin(EnabledLights) + i + 1, std::end(EnabledLights));
+				}
+				return -1;
+			}
+			// Enable light if a slot is free
+			if (enable && EnabledLights[i] == -1) {
+				EnabledLights[i] = index;
+				return i;
+			}
+		}
+
+		if (!enable) // we didn't disable anything
+			return -1;
+
+		// Replace the oldest element and move to end
+		EnabledLights[0] = index;
+		std::rotate(std::begin(EnabledLights), std::begin(EnabledLights) + 1, std::end(EnabledLights));
+		return 0;
+	}
+};
+
+FakeD3DState fakeD3DState = FakeD3DState();
+
 D3DXVECTOR4 toVector(D3DCOLOR color) {
 	D3DXVECTOR4 v;
 	// ARGB to XYZW
@@ -7188,7 +7273,41 @@ D3DXVECTOR4 toVector(D3DCOLOR color) {
 	return v;
 }
 
-void UpdateLightState(int);
+D3DXVECTOR4 toVector(D3DCOLORVALUE val) {
+	return D3DXVECTOR4(val.r, val.g, val.b, val.a);
+}
+
+void UpdateLightState(int enabledLightsIndex, D3DVECTOR* pLightAmbient) {
+	auto d3dLightIndex = fakeD3DState.EnabledLights[enabledLightsIndex];
+	auto light = &g_renderStateBlock.Lights[enabledLightsIndex];
+
+	if (d3dLightIndex == -1) {
+		light->Type = 0; // Disable the light
+		return;
+	}
+
+	auto d3dLight = &fakeD3DState.Lights[d3dLightIndex];
+
+	// Map D3D light to state struct
+	light->Type = (float)((int)d3dLight->Type);
+	light->Diffuse = toVector(d3dLight->Diffuse);
+	light->Specular = toVector(d3dLight->Specular);
+	light->Position = d3dLight->Position;
+	light->Direction = d3dLight->Direction;
+	light->Range = d3dLight->Range;
+	light->Falloff = d3dLight->Falloff;
+	light->Attenuation.x = d3dLight->Attenuation0;
+	light->Attenuation.y = d3dLight->Attenuation1;
+	light->Attenuation.z = d3dLight->Attenuation2;
+
+	pLightAmbient->x += d3dLight->Ambient.r;
+	pLightAmbient->y += d3dLight->Ambient.g;
+	pLightAmbient->z += d3dLight->Ambient.b;
+
+	auto cosHalfPhi = cos(d3dLight->Phi / 2);
+	light->CosHalfPhi = cosHalfPhi;
+	light->SpotIntensityDivisor = cos(d3dLight->Theta / 2) - cos(d3dLight->Phi / 2);
+}
 
 float AsFloat(uint32_t value) {
 	auto v = value;
@@ -7240,8 +7359,9 @@ void CxbxUpdateFixedFunctionStateBlock()
 	g_renderStateBlock.Modes.VertexBlend = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_VERTEXBLEND);
 	g_renderStateBlock.Modes.NormalizeNormals = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_NORMALIZENORMALS);
 
+	g_renderStateBlock.LightAmbient = { 0 };
 	for (size_t i = 0; i < g_renderStateBlock.Lights.size(); i++) {
-		UpdateLightState(i);
+		UpdateLightState(i, &g_renderStateBlock.LightAmbient);
 	}
 
 	const int CXBX_D3DVS_FIXEDFUNCSTATE_SIZE = (sizeof(RenderStateBlock) + CXBX_D3DVS_SLOT_SIZE_IN_BYTES - 1) / CXBX_D3DVS_SLOT_SIZE_IN_BYTES; // == 177 TODO : Reduce size; Keep comment updated
@@ -7818,124 +7938,6 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_DrawIndexedVerticesUP)
     }
 
 	CxbxHandleXboxCallbacks();
-}
-
-class FakeD3DState {
-
-	D3DCOLORVALUE colorValue(float r, float g, float b, float a) {
-		auto value = D3DCOLORVALUE();
-		value.r = r;
-		value.g = g;
-		value.b = b;
-		value.a = a;
-		return value;
-	}
-
-	D3DVECTOR toVector(float x, float y, float z) {
-		auto value = D3DVECTOR();
-		value.x = x;
-		value.y = y;
-		value.z = z;
-		return value;
-	}
-
-public:
-	// Lighting
-	std::array<XTL::X_D3DLIGHT8, 4096> Lights;
-	// Keep track of the last 8 lights set
-	std::array<int, 8> EnabledLights;
-
-	FakeD3DState() {
-		// Define the default light
-		// When unset lights are enabled, they're set to the default light
-		auto defaultLight = XTL::X_D3DLIGHT8();
-		defaultLight.Type = D3DLIGHT_DIRECTIONAL;
-		defaultLight.Diffuse = colorValue(1, 1, 1, 0);
-		defaultLight.Specular = colorValue(0, 0, 0, 0);
-		defaultLight.Ambient = colorValue(0, 0, 0, 0);
-		defaultLight.Position = toVector(0, 0, 0);
-		defaultLight.Direction = toVector(0, 0, 1);
-		defaultLight.Range = 0;
-		defaultLight.Falloff = 0;
-		defaultLight.Attenuation0 = 0;
-		defaultLight.Attenuation1 = 0;
-		defaultLight.Attenuation2 = 0;
-		defaultLight.Theta = 0;
-		defaultLight.Phi = 0;
-
-		// We'll just preset every light to the default light
-		Lights.fill(defaultLight);
-		EnabledLights.fill(-1);
-	}
-
-	int EnableLight(int index, bool enable) {
-		// EnabledLights contains the index of the enabled light
-		// or -1 at the end representing free slots
-
-		// Check to see if the light is already enabled
-		// Disable it if so
-		for (size_t i = 0; i < EnabledLights.size(); i++) {
-			if (EnabledLights[i] == index) {
-				// If enabling do nothing
-				// if disabling, disable the light
-				if (!enable) {
-					// Disable this light and move to the end
-					EnabledLights[i] = -1;
-					if(i != EnabledLights.size() - 1) // make sure this isn't already the last element
-						std::rotate(std::begin(EnabledLights) + i, std::begin(EnabledLights) + i + 1, std::end(EnabledLights));
-				}
-				return -1;
-			}
-			// Enable light if a slot is free
-			if (enable && EnabledLights[i] == -1) {
-				EnabledLights[i] = index;
-				return i;
-			}
-		}
-
-		if (!enable) // we didn't disable anything
-			return -1;
-
-		// Replace the oldest element and move to end
-		EnabledLights[0] = index;
-		std::rotate(std::begin(EnabledLights), std::begin(EnabledLights) + 1, std::end(EnabledLights));
-		return 0;
-	}
-};
-
-D3DXVECTOR4 toVector(D3DCOLORVALUE val) {
-	return D3DXVECTOR4(val.r, val.g, val.b, val.a);
-}
-
-FakeD3DState fakeD3DState = FakeD3DState();
-
-void UpdateLightState(int enabledLightsIndex) {
-		auto d3dLightIndex = fakeD3DState.EnabledLights[enabledLightsIndex];
-		auto light = &g_renderStateBlock.Lights[enabledLightsIndex];
-
-		if (d3dLightIndex == -1) {
-			light->Type = 0; // Disable the light
-			return;
-		}
-
-		auto d3dLight = &fakeD3DState.Lights[d3dLightIndex];
-
-		// Map D3D light to state struct
-		light->Type = (float)((int)d3dLight->Type);
-		light->Diffuse = toVector(d3dLight->Diffuse);
-		light->Specular = toVector(d3dLight->Specular);
-		light->Ambient = toVector(d3dLight->Ambient);
-		light->Position = d3dLight->Position;
-		light->Direction = d3dLight->Direction;
-		light->Range = d3dLight->Range;
-		light->Falloff = d3dLight->Falloff;
-		light->Attenuation.x = d3dLight->Attenuation0;
-		light->Attenuation.y = d3dLight->Attenuation1;
-		light->Attenuation.z = d3dLight->Attenuation2;
-
-		auto cosHalfPhi = cos(d3dLight->Phi / 2);
-		light->CosHalfPhi = cosHalfPhi;
-		light->SpotIntensityDivisor = cos(d3dLight->Theta / 2) - cos(d3dLight->Phi / 2);
 }
 
 // ******************************************************************

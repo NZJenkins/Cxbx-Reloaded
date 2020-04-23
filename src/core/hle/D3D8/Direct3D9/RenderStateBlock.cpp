@@ -42,7 +42,6 @@ struct Light {
     // And put something useful in the alpha slot
     float4 Diffuse;
     float4 Specular;
-    float4 Ambient;
     // 16 bytes
     alignas(16) float3 Position;
     alignas(16) float Range;
@@ -109,6 +108,7 @@ struct Fog {
 struct RenderStateBlock {
     alignas(16) Transforms Transforms;
     alignas(16) arr(Lights, Light, 8);
+    alignas(16) float3 LightAmbient;
     alignas(16) arr(Materials, Material, 2);
     alignas(16) Modes Modes;
     alignas(16) Fog Fog;

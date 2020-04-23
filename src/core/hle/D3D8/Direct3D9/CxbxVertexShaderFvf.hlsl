@@ -114,7 +114,6 @@ struct LightingInfo
 // Final lighting output
 struct LightingOutput
 {
-    float3 Ambient;
     LightingInfo Diffuse;
     LightingInfo Specular;
 };
@@ -150,7 +149,6 @@ LightingInfo DoSpecular(float3 lightDirWorld, float3 toViewerView, float2 powers
 LightingOutput DoPointLight(Light l, float3 toViewerView, float2 powers)
 {
     LightingOutput o;
-    o.Ambient = l.Ambient.rgb; // FIXME Precompute light ambient
     o.Diffuse.Front = o.Diffuse.Back = float3(0, 0, 0);
     o.Specular.Front = o.Specular.Back = float3(0, 0, 0);
 
@@ -188,7 +186,6 @@ LightingOutput DoPointLight(Light l, float3 toViewerView, float2 powers)
 LightingOutput DoSpotLight(Light l, float3 toViewerView, float2 powers)
 {
     LightingOutput o;
-    o.Ambient = l.Ambient.rgb; // FIXME Precompute light ambient
     o.Diffuse.Front = o.Diffuse.Back = float3(0, 0, 0);
     o.Specular.Front = o.Specular.Back = float3(0, 0, 0);
 
@@ -233,7 +230,6 @@ LightingOutput DoSpotLight(Light l, float3 toViewerView, float2 powers)
 LightingOutput DoDirectionalLight(Light l, float3 toViewerView, float2 powers)
 {
     LightingOutput o;
-    o.Ambient = l.Ambient.rgb;
     o.Diffuse.Front = o.Diffuse.Back = float3(0, 0, 0);
     o.Specular.Front = o.Specular.Back = float3(0, 0, 0);
 
@@ -266,7 +262,6 @@ LightingOutput CalcLighting(float2 powers)
     const int LIGHT_TYPE_DIRECTIONAL = 3;
 
     LightingOutput totalLightOutput;
-    totalLightOutput.Ambient = float3(0, 0, 0);
     totalLightOutput.Diffuse.Front = float3(0, 0, 0);
     totalLightOutput.Diffuse.Back = float3(0, 0, 0);
     totalLightOutput.Specular.Front = float3(0, 0, 0);
@@ -290,7 +285,6 @@ LightingOutput CalcLighting(float2 powers)
         else
             continue;
 
-        totalLightOutput.Ambient += currentLightOutput.Ambient;
         totalLightOutput.Diffuse.Front += currentLightOutput.Diffuse.Front;
         totalLightOutput.Diffuse.Back += currentLightOutput.Diffuse.Back;
         totalLightOutput.Specular.Front += currentLightOutput.Specular.Front;
@@ -599,8 +593,8 @@ VS_OUTPUT main(VS_INPUT xInput)
         LightingOutput lighting = CalcLighting(powers);
 
         // Compute each lighting component
-        float3 ambient = material.Ambient.rgb * (state.Modes.Ambient.rgb + lighting.Ambient);
-        float3 backAmbient = backMaterial.Ambient.rgb * (state.Modes.BackAmbient.rgb + lighting.Ambient);
+        float3 ambient = material.Ambient.rgb * (state.Modes.Ambient.rgb + state.LightAmbient);
+        float3 backAmbient = backMaterial.Ambient.rgb * (state.Modes.BackAmbient.rgb + state.LightAmbient);
     
         float3 diffuse = material.Diffuse.rgb * lighting.Diffuse.Front;
         float3 backDiffuse = backMaterial.Diffuse.rgb * lighting.Diffuse.Back;
