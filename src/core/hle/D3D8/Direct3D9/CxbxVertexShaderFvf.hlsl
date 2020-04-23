@@ -129,7 +129,7 @@ LightingInfo DoSpecular(float3 lightDirWorld, float3 toViewerView, float2 powers
     {
         // Blinn-Phong
         // https://learnopengl.com/Advanced-Lighting/Advanced-Lighting
-        float3 lightDirView = mul(lightDirWorld, (float3x3) state.Transforms.View); // Premultiply?
+        float3 lightDirView = mul(lightDirWorld, (float3x3) state.Transforms.View); // FIXME Premultiply and normalize light direction
         float3 halfway = normalize(toViewerView + lightDirView);
         float NdotH = dot(View.Normal, halfway);
 
@@ -150,7 +150,7 @@ LightingInfo DoSpecular(float3 lightDirWorld, float3 toViewerView, float2 powers
 LightingOutput DoPointLight(Light l, float3 toViewerView, float2 powers)
 {
     LightingOutput o;
-    o.Ambient = l.Ambient.rgb;
+    o.Ambient = l.Ambient.rgb; // FIXME Precompute light ambient
     o.Diffuse.Front = o.Diffuse.Back = float3(0, 0, 0);
     o.Specular.Front = o.Specular.Back = float3(0, 0, 0);
 
@@ -158,11 +158,16 @@ LightingOutput DoPointLight(Light l, float3 toViewerView, float2 powers)
     float3 toLightWorld = World.Position.xyz - l.Position;
     float3 lightDirWorld = normalize(toLightWorld);
     float lightDist = length(toLightWorld);
+
     // A(Constant) + A(Linear) * dist + A(Exp) * dist^2
     float attenuation =
         1 / (l.Attenuation[0]
         + l.Attenuation[1] * lightDist
         + l.Attenuation[2] * lightDist * lightDist);
+
+    // Range cutoff
+    if (lightDist > l.Range)
+        return attenuation = 0;
 
     float NdotL = dot(World.Normal, lightDirWorld);
     float3 lightDiffuse = abs(NdotL * attenuation) * l.Diffuse.rgb;
@@ -174,6 +179,8 @@ LightingOutput DoPointLight(Light l, float3 toViewerView, float2 powers)
 
     // Specular
     o.Specular = DoSpecular(lightDirWorld, toViewerView, powers, l.Specular);
+    o.Specular.Front *= attenuation;
+    o.Specular.Back *= attenuation;
 
     return o;
 }
@@ -197,7 +204,7 @@ LightingOutput DoDirectionalLight(Light l, float3 toViewerView, float2 powers)
     // Diffuse
 
     // Intensity from N . L
-    float3 toLightWorld = -normalize(l.Direction); // should we normalize?
+    float3 toLightWorld = -normalize(l.Direction); // FIXME pre-normalize light direction
     float NdotL = dot(World.Normal, toLightWorld);
     float3 lightDiffuse = abs(NdotL * l.Diffuse.rgb);
 
