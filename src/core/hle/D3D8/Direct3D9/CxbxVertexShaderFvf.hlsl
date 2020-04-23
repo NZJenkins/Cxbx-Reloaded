@@ -634,7 +634,8 @@ VS_OUTPUT main(VS_INPUT xInput)
     float fog = DoFog();
     xOut.oFog = fog;
 
-    // TODO point stuff
+    // TODO Point size for Point Sprites
+    // https://docs.microsoft.com/en-us/windows/win32/direct3d9/point-sprites
 	xOut.oPts = 0;
 
     // xOut.oD0 = float4(world.Normal, 1);
