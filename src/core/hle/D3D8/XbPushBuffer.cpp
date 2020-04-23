@@ -48,7 +48,7 @@ static void DbgDumpMesh(WORD *pIndexData, DWORD dwCount);
 
 // Determine the number of floating point texture coordinates for a given texture in the FVF texture format (indexed 0 .. 3).
 // This is the reverse of the X_D3DFVF_TEXCOORDSIZE[0..3] macros.
-constexpr unsigned CxbxGetXboxFVFNumberOfTextureDimensions(const XTL::DWORD XboxFVF, const unsigned aTextureIndex)
+unsigned CxbxGetXboxFVFNumberOfTextureDimensions(const XTL::DWORD XboxFVF, const unsigned aTextureIndex)
 {
 	assert(VshHandleIsFVF(XboxFVF));
 	assert(aTextureIndex < NV2A_MAX_TEXTURES);
