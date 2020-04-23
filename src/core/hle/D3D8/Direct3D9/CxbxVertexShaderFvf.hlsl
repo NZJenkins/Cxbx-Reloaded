@@ -198,8 +198,11 @@ LightingOutput DoSpotLight(Light l, float3 toViewerView, float2 powers)
     float3 lightDirWorld = normalize(l.Direction);
     float lightDist = length(toVertexWorld);
 
+    // https://docs.microsoft.com/en-us/windows/win32/direct3d9/light-types
     float cosAlpha = dot(lightDirWorld, toVertexDirWorld);
-    float spotIntensity = pow((cosAlpha - cos(l.Phi / 2)) / (cos(l.Theta / 2) - cos(l.Phi / 2)), l.Falloff); // Precompute terms
+    // I = ( cos(a) - cos(phi/2) ) / ( cos(theta/2) - cos(phi/2) )
+    float spotBase = saturate((cosAlpha - l.CosHalfPhi) / l.SpotIntensityDivisor);
+    float spotIntensity = pow(spotBase, l.Falloff);
 
     // A(Constant) + A(Linear) * dist + A(Exp) * dist^2
     float attenuation =

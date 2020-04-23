@@ -7932,8 +7932,10 @@ void UpdateLightState(int enabledLightsIndex) {
 		light->Attenuation.x = d3dLight->Attenuation0;
 		light->Attenuation.y = d3dLight->Attenuation1;
 		light->Attenuation.z = d3dLight->Attenuation2;
-		light->Theta = d3dLight->Theta;
-		light->Phi = d3dLight->Phi;
+
+		auto cosHalfPhi = cos(d3dLight->Phi / 2);
+		light->CosHalfPhi = cosHalfPhi;
+		light->SpotIntensityDivisor = cos(d3dLight->Theta / 2) - cos(d3dLight->Phi / 2);
 }
 
 // ******************************************************************

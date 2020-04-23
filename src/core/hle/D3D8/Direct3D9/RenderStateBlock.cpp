@@ -53,8 +53,8 @@ struct Light {
     alignas(16) float3 Attenuation;
     alignas(16) float Falloff;
     //
-    alignas(16) float Theta;
-    alignas(16) float Phi;
+    alignas(16) float CosHalfPhi;
+    alignas(16) float SpotIntensityDivisor;
 };
 
 struct Material {
