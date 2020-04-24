@@ -115,8 +115,12 @@ struct RenderStateBlock {
     alignas(16) arr(TextureStates, TextureState, 4);
 };
 
+#ifdef  __cplusplus
 #undef float4x4
 #undef float4
 #undef float3
 #undef float2
+#else // HLSL
+#undef alignas
+#endif //  __cplusplus
 #undef arr
