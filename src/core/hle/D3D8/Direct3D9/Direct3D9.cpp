@@ -1069,7 +1069,7 @@ void CxbxUpdateVertexConstantRegistersInDeclaration(const CxbxVertexShaderInfo *
 		vertexDefaultFlags[i] = (VertexShaderInfo != nullptr && VertexShaderInfo->vRegisterInDeclaration[i]) ? 0.0f : 1.0f;
 	}
 
-	g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_ATTRFLAG_BASE, vertexDefaultFlags, CXBX_D3DVS_ATTRFLAG_BASE);
+	g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_ATTRFLAG_BASE, vertexDefaultFlags, CXBX_D3DVS_ATTRFLAG_SIZE);
 }
 
 // Forward declaration of CxbxGetPixelContainerMeasures to prevent
@@ -7376,6 +7376,13 @@ void CxbxUpdateNativeD3DResources()
 
     EmuUpdateActiveTextureStages();
 
+	// NOTE: Order is important here
+// Some Texture States depend on RenderState values (Point Sprites)
+// And some Pixel Shaders depend on Texture State values (BumpEnvMat, etc)
+	XboxRenderStates.Apply();
+	XboxTextureStates.Apply();
+
+
 	if (isFixedFunctionMode) {
 		CxbxUpdateFixedFunctionStateBlock();
 	} else {
@@ -7396,12 +7403,6 @@ void CxbxUpdateNativeD3DResources()
 		}
 		g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_CONSTREG_XBOX_BASE, (float*)&g_vshConstants, CXBX_D3DVS_CONSTREG_XBOX_SIZE);
 	}
-
-    // NOTE: Order is important here
-    // Some Texture States depend on RenderState values (Point Sprites)
-    // And some Pixel Shaders depend on Texture State values (BumpEnvMat, etc)
-    XboxRenderStates.Apply();
-    XboxTextureStates.Apply();
 
     // If Pixel Shaders are not disabled, process them
     if (!g_DisablePixelShaders) {
