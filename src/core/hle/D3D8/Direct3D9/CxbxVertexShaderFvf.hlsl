@@ -341,9 +341,8 @@ TransformInfo DoWorldTransform(const float4 position, const float3 normal, const
 
 Material DoMaterial(const uint index, const float4 color0, const float4 color1)
 {
-    Material stateMat = state.Materials[index];
+    Material runtimeMat = state.Materials[index];
 
-    Material runtimeMat;
     if (state.Modes.ColorVertex)
     {
 		// https://docs.microsoft.com/en-us/windows/win32/direct3d9/d3dmaterialcolorsource
@@ -355,42 +354,33 @@ Material DoMaterial(const uint index, const float4 color0, const float4 color1)
         // Do we use the material value like D3D9? Or the default colour value (which you can set on Xbox)
         // In D3D9 "If either AMBIENTMATERIALSOURCE option is used, and the vertex color is not provided, then the material ambient color is used."
         if (state.Modes.AmbientMaterialSource == D3DMCS_MATERIAL)
-            runtimeMat.Ambient = stateMat.Ambient;
+			; // Already assigned : runtimeMat.Ambient = stateMat.Materials[index].Ambient;
         else if (state.Modes.AmbientMaterialSource == D3DMCS_COLOR1)
             runtimeMat.Ambient = color0;
         else
             runtimeMat.Ambient = color1;
 
-        if (state.Modes.DiffuseMaterialSource == D3DMCS_MATERIAL)
-            runtimeMat.Diffuse = stateMat.Diffuse;
+       if (state.Modes.DiffuseMaterialSource == D3DMCS_MATERIAL)
+			; // Already assigned : runtimeMat.Diffuse = stateMat.Materials[index].Diffuse;
         else if (state.Modes.DiffuseMaterialSource == D3DMCS_COLOR1)
             runtimeMat.Diffuse = color0;
         else
             runtimeMat.Diffuse = color1;
 
         if (state.Modes.SpecularMaterialSource == D3DMCS_MATERIAL)
-            runtimeMat.Specular = stateMat.Specular;
+			; // Already assigned : runtimeMat.Specular = stateMat.Materials[index].Specular;
         else if (state.Modes.SpecularMaterialSource == D3DMCS_COLOR1)
             runtimeMat.Specular = color0;
         else
             runtimeMat.Specular = color1;
 
         if (state.Modes.EmissiveMaterialSource == D3DMCS_MATERIAL)
-            runtimeMat.Emissive = stateMat.Emissive;
+			; // Already assigned : runtimeMat.Emissive = stateMat.Materials[index].Emissive;
         else if (state.Modes.EmissiveMaterialSource == D3DMCS_COLOR1)
             runtimeMat.Emissive = color0;
         else
             runtimeMat.Emissive = color1;
     }
-    else
-    {
-        runtimeMat.Ambient = stateMat.Ambient;
-        runtimeMat.Diffuse = stateMat.Diffuse;
-        runtimeMat.Specular = stateMat.Specular;
-        runtimeMat.Emissive = stateMat.Emissive;
-    }
-
-    runtimeMat.Power = stateMat.Power;
 
     return runtimeMat;
 }
