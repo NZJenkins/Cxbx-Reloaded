@@ -46,7 +46,7 @@ struct Light {
     alignas(16) float3 Position;
     alignas(16) float Range;
     // 16 bytes
-    alignas(16) float3 Direction;
+    alignas(16) float3 NormalizedDirection;
     alignas(16) float Type; // 1=Point, 2=Spot, 3=Directional
     //
     alignas(16) float3 Attenuation;

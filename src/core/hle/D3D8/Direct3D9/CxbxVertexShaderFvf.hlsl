@@ -188,7 +188,7 @@ LightingOutput DoSpotLight(const Light l, const float3 toViewerView, const float
     // Diffuse
     float3 toVertexWorld = World.Position.xyz - l.Position;
     float3 toVertexDirWorld = normalize(toVertexWorld);
-    float3 lightDirWorld = normalize(l.Direction);
+    float3 lightDirWorld = l.NormalizedDirection;
     float lightDist = length(toVertexWorld);
 
     // https://docs.microsoft.com/en-us/windows/win32/direct3d9/light-types
@@ -232,7 +232,7 @@ LightingOutput DoDirectionalLight(const Light l, const float3 toViewerView, cons
     // Diffuse
 
     // Intensity from N . L
-    float3 toLightWorld = -normalize(l.Direction); // FIXME pre-normalize light direction
+    float3 toLightWorld = -l.NormalizedDirection;
     float NdotL = dot(World.Normal, toLightWorld);
     float3 lightDiffuse = abs(NdotL * l.Diffuse.rgb);
 
@@ -569,7 +569,7 @@ VS_OUTPUT main(const VS_INPUT xInput)
     // Projection transform - final position
     xOut.oPos = mul(View.Position, state.Transforms.Projection);
 
-    float3 cameraPosWorld = -state.Transforms.View[3].xyz;
+    // Unused float3 cameraPosWorld = -state.Transforms.View[3].xyz;
 
     // Vertex lighting
     if (state.Modes.Lighting || state.Modes.TwoSidedLighting)

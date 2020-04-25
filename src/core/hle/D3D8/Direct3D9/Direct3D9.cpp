@@ -7293,7 +7293,7 @@ void UpdateLightState(int enabledLightsIndex, D3DVECTOR* pLightAmbient) {
 	light->Diffuse = toVector(d3dLight->Diffuse);
 	light->Specular = toVector(d3dLight->Specular);
 	light->Position = d3dLight->Position;
-	light->Direction = d3dLight->Direction;
+	D3DXVec3Normalize((D3DXVECTOR3*)&d3dLight->Direction, (D3DXVECTOR3*)&light->NormalizedDirection); // Pre-normalize light direction
 	light->Range = d3dLight->Range;
 	light->Falloff = d3dLight->Falloff;
 	light->Attenuation.x = d3dLight->Attenuation0;
