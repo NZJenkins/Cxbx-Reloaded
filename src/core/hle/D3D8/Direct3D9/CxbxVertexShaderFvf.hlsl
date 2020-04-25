@@ -51,30 +51,26 @@ static const uint reserved0 = 13;   // Has no X_D3DFVF_*     / X_D3DVSDE_*
 static const uint reserved1 = 14;   // Has no X_D3DFVF_*     / X_D3DVSDE_*
 static const uint reserved2 = 15;   // Has no X_D3DFVF_*     / X_D3DVSDE_*
 
-inline float4 Get(const VS_INPUT xIn, const uint index)
+float4 Get(const VS_INPUT xIn, const uint index)
 {
 #ifdef CXBX_ALL_TEXCOORD_INPUTS
 	return xIn.v[index];
 #else
-    switch (index) {
-        case position: return xIn.pos;
-        case weight: return xIn.bw;
-        case normal: return xIn.normal;
-        case diffuse: return xIn.color[0];
-        case specular: return xIn.color[1];
-        case fogCoord: return 1.f;
-        case pointSize: return 1.f;
-        case backDiffuse: return xIn.backColor[0];
-        case backSpecular: return xIn.backColor[1];
-        case texcoord0: return xIn.texcoord[0];
-        case texcoord1: return xIn.texcoord[1];
-        case texcoord2: return xIn.texcoord[2];
-        case texcoord3: return xIn.texcoord[3];
-        case reserved0: return 1.f;
-        case reserved1: return 1.f;
-        case reserved2: return 1.f;
-    default: return 1.f;
-    }
+    // switch statements inexplicably don't work here
+    if(index == position) return xIn.pos;
+    if(index == weight) return xIn.bw;
+    if(index == normal) return xIn.normal;
+    if(index == diffuse) return xIn.color[0];
+    if(index == specular) return xIn.color[1];
+    //if(i == fogCoord) xIn.fog = value;
+    //if(i == pointSize) xIn.psize = value;
+    if(index == backDiffuse) return xIn.backColor[0];
+    if(index == backSpecular) return xIn.backColor[1];
+    if(index == texcoord0) return xIn.texcoord[0];
+    if(index == texcoord1) return xIn.texcoord[1];
+    if(index == texcoord2) return xIn.texcoord[2];
+    if(index == texcoord3) return xIn.texcoord[3];
+    return 1;
 #endif
 }
 
@@ -527,25 +523,20 @@ VS_INPUT DoGetInputRegisterOverrides(const VS_INPUT xInput)
 #ifdef CXBX_ALL_TEXCOORD_INPUTS
         xIn.v[i] = value;
 #else
-        switch (i) {
-            case position: xIn.pos = value; break;
-            case weight: xIn.bw = value; break;
-            case normal: xIn.normal = value; break;
-            case diffuse: xIn.color[0] = value; break;
-            case specular: xIn.color[1] = value; break;
-            case fogCoord: break;
-            case pointSize: break;
-            case backDiffuse: xIn.backColor[0] = value; break;
-            case backSpecular: xIn.backColor[1] = value; break;
-            case texcoord0: xIn.texcoord[0] = value; break;
-            case texcoord1: xIn.texcoord[1] = value; break;
-            case texcoord2: xIn.texcoord[2] = value; break;
-            case texcoord3: xIn.texcoord[3] = value; break;
-            case reserved0: break;
-            case reserved1: break;
-            case reserved2: break;
-        default: break;
-        }
+	// switch statements inexplicably don't work here
+	if(i == position) xIn.pos = value;
+	if(i == weight) xIn.bw = value;
+	if(i == normal) xIn.normal = value;
+	if(i == diffuse) xIn.color[0] = value;
+	if(i == specular) xIn.color[1] = value;
+	//if(i == fogCoord) xIn.fog = value;
+	//if(i == pointSize) xIn.psize = value;
+	if(i == backDiffuse) xIn.backColor[0] = value;
+	if(i == backSpecular) xIn.backColor[1] = value;
+	if(i == texcoord0) xIn.texcoord[0] = value;
+	if(i == texcoord1) xIn.texcoord[1] = value;
+	if(i == texcoord2) xIn.texcoord[2] = value;
+	if(i == texcoord3) xIn.texcoord[3] = value;
 #endif
     }
 
