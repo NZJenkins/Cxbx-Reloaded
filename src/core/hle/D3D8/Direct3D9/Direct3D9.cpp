@@ -999,6 +999,7 @@ void SetXboxVertexShaderConstant(int index, const float* value) {
 }
 
 bool isFixedFunctionMode = false;
+static IDirect3DVertexShader9* fvfShader = nullptr;
 
 void SetFixedFunctionShader() {
 	isFixedFunctionMode = true;
@@ -1008,12 +1009,11 @@ void SetFixedFunctionShader() {
 		return;
 	}
 
-	static IDirect3DVertexShader9* fvfShader = nullptr;
-
 	if (!fvfShader) {
 		DWORD* blobby = nullptr;
 		EmuCompileXboxFvf((char**)&blobby);
-		g_pD3DDevice->CreateVertexShader(blobby, &fvfShader);
+		auto hRet = g_pD3DDevice->CreateVertexShader(blobby, &fvfShader);
+		if (hRet != D3D_OK) CxbxKrnlCleanup("creating FF shader failed");
 	}
 
 	g_pD3DDevice->SetVertexShader(fvfShader);

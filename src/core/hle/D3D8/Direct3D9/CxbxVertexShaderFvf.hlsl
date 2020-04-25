@@ -10,7 +10,7 @@ uniform float4 vRegisterDefaultFlagsPacked[4] : register(c208); // Matches CXBX_
 //uniform float4 xboxViewportScale   : register(c212); // Matches CXBX_D3DVS_VIEWPORT_MIRROR_SCALE_BASE
 //uniform float4 xboxViewportOffset  : register(c213); // Matches CXBX_D3DVS_VIEWPORT_MIRROR_OFFSET_BASE
 
-uniform RenderStateBlock state : register(c214); // Matches CXBX_D3DVS_FIXEDFUNCSTATE_BASE
+uniform RenderStateBlock state : register(c0); // Matches CXBX_D3DVS_FIXEDFUNCSTATE_BASE
 
 #undef CXBX_ALL_TEXCOORD_INPUTS // Enable this to disable semantics in VS_INPUT (instead, we'll use an array of generic TEXCOORD's)
 

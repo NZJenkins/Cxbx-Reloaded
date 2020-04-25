@@ -328,7 +328,7 @@ static ID3DBlob* pFvfHostShader = nullptr;
 
 extern HRESULT EmuCompileXboxFvf(char** shaderData)
 {
-	if (!pFvfHostShader) {
+	if (fvfShaderBuffer.size() == 0) {
 		// std::ifstream shaderStream(R"(C:\Users\Anthony\Desktop\_\dev\Cxbx-Reloaded\build\x86-Release\bin\Release\CxbxVertexShaderFvf.cso)", std::ios::in | std::ios::binary);
 		auto outputDir = std::filesystem::path(szFilePath_CxbxReloaded_Exe).parent_path();
 		std::ifstream shaderStream(outputDir.append("CxbxVertexShaderFvf.cso").string(), std::ios::in | std::ios::binary);
