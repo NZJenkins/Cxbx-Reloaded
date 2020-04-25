@@ -66,9 +66,6 @@ struct Material {
 };
 
 struct Modes {
-    float4 Ambient;
-    float4 BackAmbient;
-
     alignas(16) float AmbientMaterialSource;
     alignas(16) float DiffuseMaterialSource;
     alignas(16) float SpecularMaterialSource;
@@ -108,7 +105,8 @@ struct Fog {
 struct RenderStateBlock {
     alignas(16) Transforms Transforms;
     alignas(16) arr(Lights, Light, 8);
-    alignas(16) float3 LightAmbient;
+    alignas(16) float4 AmbientPlusLightAmbient;
+    alignas(16) float4 BackAmbientPlusLightAmbient;
     alignas(16) arr(Materials, Material, 2);
     alignas(16) Modes Modes;
     alignas(16) Fog Fog;

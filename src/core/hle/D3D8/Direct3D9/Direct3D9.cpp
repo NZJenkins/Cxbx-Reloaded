@@ -7277,7 +7277,7 @@ D3DXVECTOR4 toVector(D3DCOLORVALUE val) {
 	return D3DXVECTOR4(val.r, val.g, val.b, val.a);
 }
 
-void UpdateLightState(int enabledLightsIndex, D3DVECTOR* pLightAmbient) {
+void UpdateLightState(int enabledLightsIndex, D3DXVECTOR4* pLightAmbient) {
 	auto d3dLightIndex = fakeD3DState.EnabledLights[enabledLightsIndex];
 	auto light = &g_renderStateBlock.Lights[enabledLightsIndex];
 
@@ -7323,8 +7323,8 @@ void CxbxUpdateFixedFunctionStateBlock()
 	g_renderStateBlock.Modes.LocalViewer = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_LOCALVIEWER);
 	g_renderStateBlock.Modes.ColorVertex = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_COLORVERTEX);
 
-	g_renderStateBlock.Modes.Ambient = toVector(XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_AMBIENT));
-	g_renderStateBlock.Modes.BackAmbient = toVector(XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_BACKAMBIENT));
+	D3DXVECTOR4 Ambient = toVector(XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_AMBIENT));
+	D3DXVECTOR4 BackAmbient = toVector(XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_BACKAMBIENT));
 
 	// Material sources
 	g_renderStateBlock.Modes.AmbientMaterialSource = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_AMBIENTMATERIALSOURCE);
@@ -7359,10 +7359,13 @@ void CxbxUpdateFixedFunctionStateBlock()
 	g_renderStateBlock.Modes.VertexBlend = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_VERTEXBLEND);
 	g_renderStateBlock.Modes.NormalizeNormals = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_NORMALIZENORMALS);
 
-	g_renderStateBlock.LightAmbient = { 0 };
+	auto LightAmbient = D3DXVECTOR4(0.f, 0.f, 0.f, 0.f);
 	for (size_t i = 0; i < g_renderStateBlock.Lights.size(); i++) {
-		UpdateLightState(i, &g_renderStateBlock.LightAmbient);
+		UpdateLightState(i, &LightAmbient);
 	}
+
+	g_renderStateBlock.AmbientPlusLightAmbient = Ambient + LightAmbient;
+	g_renderStateBlock.BackAmbientPlusLightAmbient = BackAmbient + LightAmbient;
 
 	const int CXBX_D3DVS_FIXEDFUNCSTATE_SIZE = (sizeof(RenderStateBlock) + CXBX_D3DVS_SLOT_SIZE_IN_BYTES - 1) / CXBX_D3DVS_SLOT_SIZE_IN_BYTES; // == 177 TODO : Reduce size; Keep comment updated
 

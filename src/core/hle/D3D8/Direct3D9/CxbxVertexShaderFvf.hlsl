@@ -573,8 +573,8 @@ VS_OUTPUT main(const VS_INPUT xInput)
         LightingOutput lighting = CalcLighting(powers);
 
         // Compute each lighting component
-        float3 ambient = material.Ambient.rgb * (state.Modes.Ambient.rgb + state.LightAmbient);
-        float3 backAmbient = backMaterial.Ambient.rgb * (state.Modes.BackAmbient.rgb + state.LightAmbient);
+        float3 ambient = material.Ambient.rgb * state.AmbientPlusLightAmbient.rgb;
+        float3 backAmbient = backMaterial.Ambient.rgb * state.BackAmbientPlusLightAmbient.rgb;
     
         float3 diffuse = material.Diffuse.rgb * lighting.Diffuse.Front;
         float3 backDiffuse = backMaterial.Diffuse.rgb * lighting.Diffuse.Back;
