@@ -1019,7 +1019,7 @@ void SetFixedFunctionShader() {
 	g_pD3DDevice->SetVertexShader(fvfShader);
 }
 
-void CxbxUpdateVertexConstantRegistersInDeclaration(const CxbxVertexShaderInfo* VertexShaderInfo); // forward declaration to avoid code moving
+void CxbxUpdateVertexConstantRegistersInDeclaration(const CxbxVertexDeclaration* pDecl); // forward declaration to avoid code moving
 
 void SetCxbxVertexShader(CxbxVertexShader* pCxbxVertexShader) {
 
@@ -1037,28 +1037,17 @@ void SetCxbxVertexShader(CxbxVertexShader* pCxbxVertexShader) {
 	hRet = g_pD3DDevice->SetVertexShader(pHostShader);
 	DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetVertexShader");
 
-	// Set either FVF or the vertex declaration
-	if (pCxbxVertexShader->HostFVF)
-	{
-		// Set the FVF
-		CxbxKrnlCleanup("oh shit");
-		hRet = g_pD3DDevice->SetFVF(pCxbxVertexShader->HostFVF);
-		DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetFVF");
-	}
-	else
-	{
-		// Set vertex declaration
-		hRet = g_pD3DDevice->SetVertexDeclaration(pCxbxVertexShader->pHostVertexDeclaration);
-		DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetVertexDeclaration");
-	}
+	// Set vertex declaration
+	hRet = g_pD3DDevice->SetVertexDeclaration(pCxbxVertexShader->Declaration.pHostVertexDeclaration);
+	DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetVertexDeclaration");
 
 	// Set vertex shader constants if necessary
 	if (pHostShader) {
-		CxbxUpdateVertexConstantRegistersInDeclaration(&(pCxbxVertexShader->VertexShaderInfo));
+		CxbxUpdateVertexConstantRegistersInDeclaration(&(pCxbxVertexShader->Declaration));
 	}
 }
 
-void CxbxUpdateVertexConstantRegistersInDeclaration(const CxbxVertexShaderInfo *VertexShaderInfo)
+void CxbxUpdateVertexConstantRegistersInDeclaration(const CxbxVertexDeclaration *pDecl)
 {
 	// Titles can specify default values for registers via calls like SetVertexData4f
 	// HLSL shaders need to know whether to use vertex data or default vertex shader values
@@ -1066,7 +1055,7 @@ void CxbxUpdateVertexConstantRegistersInDeclaration(const CxbxVertexShaderInfo *
 	float vertexDefaultFlags[X_VSH_MAX_ATTRIBUTES];
 
 	for (int i = 0; i < X_VSH_MAX_ATTRIBUTES; i++) {
-		vertexDefaultFlags[i] = (VertexShaderInfo != nullptr && VertexShaderInfo->vRegisterInDeclaration[i]) ? 0.0f : 1.0f;
+		vertexDefaultFlags[i] = (pDecl != nullptr && pDecl->vRegisterInDeclaration[i]) ? 0.0f : 1.0f;
 	}
 
 	g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_ATTRFLAG_BASE, vertexDefaultFlags, CXBX_D3DVS_ATTRFLAG_SIZE);
@@ -4268,10 +4257,10 @@ HRESULT WINAPI XTL::EMUPATCH(D3DDevice_CreateVertexShader)
 	pRecompiledDeclaration = EmuRecompileVshDeclaration((DWORD*)pDeclaration,
                                                    /*bIsFixedFunction=*/pFunction == xbnullptr,
                                                    &XboxDeclarationCount,
-                                                   &pCxbxVertexShader->VertexShaderInfo);
+                                                   &pCxbxVertexShader->Declaration);
 
 	// Create the vertex declaration
-	hRet = g_pD3DDevice->CreateVertexDeclaration(pRecompiledDeclaration, &pCxbxVertexShader->pHostVertexDeclaration);
+	hRet = g_pD3DDevice->CreateVertexDeclaration(pRecompiledDeclaration, &pCxbxVertexShader->Declaration.pHostVertexDeclaration);
 	free(pRecompiledDeclaration);
 
 	DEBUG_D3DRESULT(hRet, "g_pD3DDevice->CreateVertexDeclaration");
@@ -4280,8 +4269,11 @@ HRESULT WINAPI XTL::EMUPATCH(D3DDevice_CreateVertexShader)
 		// NOTE: This is a fatal error because it ALWAYS triggers a crash within DrawVertices if not set
 		CxbxKrnlCleanup("Failed to create Vertex Declaration");
 	}
-	g_pD3DDevice->SetVertexDeclaration(pCxbxVertexShader->pHostVertexDeclaration);
+	hRet = g_pD3DDevice->SetVertexDeclaration(pCxbxVertexShader->Declaration.pHostVertexDeclaration);
 	DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetVertexDeclaration");
+	if (FAILED(hRet)) {
+		CxbxKrnlCleanup("Failed to set Vertex Declaration");
+	}
 
 	uint64_t      vertexShaderKey = 0;
 	DWORD         XboxFunctionSize = 0;
@@ -4290,31 +4282,22 @@ HRESULT WINAPI XTL::EMUPATCH(D3DDevice_CreateVertexShader)
 		vertexShaderKey = g_VertexShaderSource.CreateShader(pFunction, &XboxFunctionSize);
 	}
 
-	pCxbxVertexShader->pXboxDeclarationCopy = (DWORD*)malloc(XboxDeclarationCount * sizeof(DWORD));
-	memcpy(pCxbxVertexShader->pXboxDeclarationCopy, pDeclaration, XboxDeclarationCount * sizeof(DWORD));
+	pCxbxVertexShader->Declaration.pXboxDeclarationCopy = (DWORD*)malloc(XboxDeclarationCount * sizeof(DWORD));
+	memcpy(pCxbxVertexShader->Declaration.pXboxDeclarationCopy, pDeclaration, XboxDeclarationCount * sizeof(DWORD));
 	pCxbxVertexShader->XboxFunctionSize = 0;
 	pCxbxVertexShader->pXboxFunctionCopy = nullptr;
 	pCxbxVertexShader->XboxVertexShaderType = X_VST_NORMAL; // TODO : This can vary
 	pCxbxVertexShader->XboxNrAddressSlots = (XboxFunctionSize - sizeof(X_VSH_SHADER_HEADER)) / X_VSH_INSTRUCTION_SIZE_BYTES;
-	pCxbxVertexShader->HostFVF = 0;
 	pCxbxVertexShader->VertexShaderKey = vertexShaderKey;
-	pCxbxVertexShader->XboxDeclarationCount = XboxDeclarationCount;
+	pCxbxVertexShader->Declaration.XboxDeclarationCount = XboxDeclarationCount;
 	// Save the status, to remove things later
 	// pCxbxVertexShader->XboxStatus = hRet; // Not even used by VshHandleIsValidShader()
 
-    if(SUCCEEDED(hRet))
+    if(pFunction != xbnullptr)
     {
-        if(pFunction != xbnullptr)
-        {
-            pCxbxVertexShader->XboxFunctionSize = XboxFunctionSize;
-            pCxbxVertexShader->pXboxFunctionCopy = (DWORD*)malloc(XboxFunctionSize);
-            memcpy(pCxbxVertexShader->pXboxFunctionCopy, pFunction, XboxFunctionSize);
-        }
-    }
-    else
-    {
-		LOG_TEST_CASE("Falling back to FVF shader");
-		pCxbxVertexShader->HostFVF = D3DFVF_XYZ | D3DFVF_TEX0;
+        pCxbxVertexShader->XboxFunctionSize = XboxFunctionSize;
+        pCxbxVertexShader->pXboxFunctionCopy = (DWORD*)malloc(XboxFunctionSize);
+        memcpy(pCxbxVertexShader->pXboxFunctionCopy, pFunction, XboxFunctionSize);
     }
 
 	// Register the host Vertex Shader
@@ -8218,17 +8201,17 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_DeleteVertexShader)
 		CxbxVertexShader *pCxbxVertexShader = GetCxbxVertexShader(Handle);
 		SetCxbxVertexShader(Handle, nullptr);
 
-		if (pCxbxVertexShader->pHostVertexDeclaration) {
-			HRESULT hRet = pCxbxVertexShader->pHostVertexDeclaration->Release();
+		if (pCxbxVertexShader->Declaration.pHostVertexDeclaration) {
+			HRESULT hRet = pCxbxVertexShader->Declaration.pHostVertexDeclaration->Release();
 			DEBUG_D3DRESULT(hRet, "g_pD3DDevice->DeleteVertexShader(pHostVertexDeclaration)");
 		}
 
 		// Release the host vertex shader
 		g_VertexShaderSource.ReleaseShader(pCxbxVertexShader->VertexShaderKey);
 
-		if (pCxbxVertexShader->pXboxDeclarationCopy)
+		if (pCxbxVertexShader->Declaration.pXboxDeclarationCopy)
 		{
-			free(pCxbxVertexShader->pXboxDeclarationCopy);
+			free(pCxbxVertexShader->Declaration.pXboxDeclarationCopy);
 		}
 
 		if (pCxbxVertexShader->pXboxFunctionCopy)
@@ -8464,7 +8447,7 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_LoadVertexShaderProgram)
         }
 
         // Simply retrieve the contents of the existing vertex shader program
-		pXboxVertexDeclaration = pCxbxVertexShader->pXboxDeclarationCopy;
+		pXboxVertexDeclaration = pCxbxVertexShader->Declaration.pXboxDeclarationCopy;
     } else {
         // This is an unusual scenario in which an FVF-based shader is being replaced with an actual shader
         // But without calling CreateVertexShader: This means we need to parse the current FVF and generate
@@ -8580,13 +8563,13 @@ HRESULT WINAPI XTL::EMUPATCH(D3DDevice_GetVertexShaderDeclaration)
     if (pSizeOfData) {
         CxbxVertexShader *pCxbxVertexShader = GetCxbxVertexShader(Handle);
 		if (pCxbxVertexShader) {
-			DWORD sizeOfData = pCxbxVertexShader->XboxDeclarationCount * sizeof(DWORD);
+			DWORD sizeOfData = pCxbxVertexShader->Declaration.XboxDeclarationCount * sizeof(DWORD);
 			if (*pSizeOfData < sizeOfData || !pData) {
 				*pSizeOfData = sizeOfData;
 				hRet = !pData ? D3D_OK : D3DERR_MOREDATA;
 			}
 			else {
-				memcpy(pData, pCxbxVertexShader->pXboxDeclarationCopy, pCxbxVertexShader->XboxDeclarationCount * sizeof(DWORD));
+				memcpy(pData, pCxbxVertexShader->Declaration.pXboxDeclarationCopy, pCxbxVertexShader->Declaration.XboxDeclarationCount * sizeof(DWORD));
 				hRet = D3D_OK;
 			}
 		}
