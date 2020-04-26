@@ -221,7 +221,8 @@ extern void EmuParseVshFunction
 (
 	DWORD* pXboxFunction,
 	DWORD* pXboxFunctionSize,
-	IntermediateVertexShader* pShader
+	IntermediateVertexShader* pShader,
+	DWORD** ppXboxShaderInstructions
 );
 
 extern void FreeVertexDynamicPatch(CxbxVertexShader *pVertexShader);

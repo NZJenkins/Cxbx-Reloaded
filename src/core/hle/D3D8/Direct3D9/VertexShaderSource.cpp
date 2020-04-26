@@ -42,12 +42,17 @@ ID3DBlob* AsyncCreateVertexShader(IntermediateVertexShader intermediateShader, S
 ShaderKey VertexShaderSource::CreateShader(const DWORD* pXboxFunction, DWORD *pXboxFunctionSize) {
 	IntermediateVertexShader intermediateShader;
 
+	DWORD* pXboxShaderInstructions;
+
 	// Parse into intermediate format
 	EmuParseVshFunction((DWORD*)pXboxFunction,
 		pXboxFunctionSize,
-		&intermediateShader);
+		&intermediateShader,
+		&pXboxShaderInstructions);
 
-	ShaderKey key = ComputeHash((void*)pXboxFunction, *pXboxFunctionSize);
+	// Build a shader key from the Xbox shader instructions
+	auto instructionsSize = intermediateShader.Instructions.size() * X_VSH_INSTRUCTION_SIZE_BYTES;
+	ShaderKey key = ComputeHash((void*)pXboxShaderInstructions, instructionsSize);
 
 	// Check if we need to create the shader
 	auto it = cache.find(key);
