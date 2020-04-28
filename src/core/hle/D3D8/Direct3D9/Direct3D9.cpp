@@ -127,6 +127,86 @@ static bool                         g_bEnableHostQueryVisibilityTest = true;
 static std::stack<IDirect3DQuery*>  g_HostQueryVisibilityTests;
 static std::map<int, IDirect3DQuery*> g_HostVisibilityTestMap;
 
+static std::map<uint64_t, CxbxVertexDeclaration> g_HostVertexDeclarationsCache;
+static CxbxVertexDeclaration* g_CurrentHostVertexDeclarations = nullptr;
+
+bool LookupHostVertexDeclarations(uint64_t key, CxbxVertexDeclaration* pDecl) {
+	auto it = g_HostVertexDeclarationsCache.find(key);
+	if (it == g_HostVertexDeclarationsCache.end()) {
+		return false;;
+	}
+	*pDecl = it->second;;
+	return true;
+}
+
+CxbxVertexDeclaration CreateHostVertexDeclarations(uint64_t key, DWORD* pDeclaration) {
+	CxbxVertexDeclaration decl;
+	CxbxVertexDeclaration unused;
+	HRESULT hRet;
+
+	// FVF declaration
+	D3DVERTEXELEMENT* pRecompiledDeclaration = nullptr;
+	pRecompiledDeclaration = EmuRecompileVshDeclaration(
+		pDeclaration,
+		true,
+		&decl);
+
+	// Create the vertex declaration
+	hRet = g_pD3DDevice->CreateVertexDeclaration(pRecompiledDeclaration, &decl.hostDeclarations.FixedFunction);
+	if (FAILED(hRet)) {
+		// NOTE: This is a fatal error because it ALWAYS triggers a crash within DrawVertices if not set
+		CxbxKrnlCleanup("Failed to create Vertex Declaration");
+	}
+	free(pRecompiledDeclaration);
+
+	// Shader declaration
+	pRecompiledDeclaration = EmuRecompileVshDeclaration(
+		pDeclaration,
+		false,
+		&unused);
+
+	// Create the vertex declaration
+	hRet = g_pD3DDevice->CreateVertexDeclaration(pRecompiledDeclaration, &decl.hostDeclarations.ShaderFunction);
+	if (FAILED(hRet)) {
+		// NOTE: This is a fatal error because it ALWAYS triggers a crash within DrawVertices if not set
+		CxbxKrnlCleanup("Failed to create Vertex Declaration");
+	}
+	free(pRecompiledDeclaration);
+
+	g_HostVertexDeclarationsCache.emplace(key, decl);
+	return decl;
+}
+
+CxbxVertexDeclaration GetHostVertexDeclarations(DWORD xboxFvf) {
+	// Use the FVF as the key
+	uint64_t key = xboxFvf;
+
+	CxbxVertexDeclaration decl;
+	if (LookupHostVertexDeclarations(key, &decl)) {
+		return decl;
+	}
+
+	auto fakeXboxDeclaration = EmuConvertFvfToXboxDeclaration(xboxFvf);
+	return CreateHostVertexDeclarations(key, fakeXboxDeclaration.data());
+}
+
+CxbxVertexDeclaration GetHostVertexDeclarations(DWORD* xboxDeclaration) {
+	// Hash the declaration
+	DWORD* last = xboxDeclaration;
+	while (*last != X_D3DVSD_END()) {
+		last++;
+	}
+
+	auto key = ComputeHash((void*)xboxDeclaration, (last - xboxDeclaration) * sizeof(DWORD));
+
+	CxbxVertexDeclaration decl;
+	if (LookupHostVertexDeclarations(key, &decl)) {
+		return decl;
+	}
+
+	return CreateHostVertexDeclarations(key, xboxDeclaration);
+}
+
 // cached Direct3D state variable(s)
 static size_t                       g_QuadToTriangleHostIndexBuffer_Size = 0; // = NrOfQuadIndices
 static INDEX16                     *g_pQuadToTriangleIndexData = nullptr;
@@ -999,19 +1079,12 @@ void SetCxbxVertexShader(CxbxVertexShader* pCxbxVertexShader) {
 	hRet = g_pD3DDevice->SetVertexShader(pHostShader);
 	DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetVertexShader");
 
-	// Set either FVF or the vertex declaration
-	if (pCxbxVertexShader->Declaration.HostFVF)
-	{
-		// Set the FVF
-		hRet = g_pD3DDevice->SetFVF(pCxbxVertexShader->Declaration.HostFVF);
-		DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetFVF");
-	}
-	else
-	{
-		// Set vertex declaration
-		hRet = g_pD3DDevice->SetVertexDeclaration(pCxbxVertexShader->Declaration.pHostVertexDeclaration);
-		DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetVertexDeclaration");
-	}
+	auto decl = pHostShader == nullptr
+		? pCxbxVertexShader->Declaration.hostDeclarations.FixedFunction
+		: pCxbxVertexShader->Declaration.hostDeclarations.ShaderFunction;
+	// Set the vertex declaration
+	hRet = g_pD3DDevice->SetVertexDeclaration(decl);
+	DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetVertexDeclaration");
 
 	// Set vertex shader constants if necessary
 	if (pHostShader) {
@@ -3617,8 +3690,8 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_SelectVertexShader)
         pCxbxVertexShader = GetCxbxVertexShader(Handle);
 		SetCxbxVertexShader(pCxbxVertexShader);
     }
-    else if(Handle == xbnull)
-    {
+	else if(Handle == xbnull)
+	{
 		HostFVF = D3DFVF_XYZ | D3DFVF_TEX0;
 		// Clear any vertex shader that may be set
 		hRet = g_pD3DDevice->SetVertexShader(nullptr);
@@ -4209,28 +4282,13 @@ HRESULT WINAPI XTL::EMUPATCH(D3DDevice_CreateVertexShader)
 	// Now, we can create the host vertex shader
 	DWORD             XboxDeclarationCount = 0;
 	CxbxVertexShader* pCxbxVertexShader = (CxbxVertexShader*)calloc(1, sizeof(CxbxVertexShader));
-	D3DVERTEXELEMENT *pRecompiledDeclaration = nullptr;
 
-	pRecompiledDeclaration = EmuRecompileVshDeclaration((DWORD*)pDeclaration,
-                                                   /*bIsFixedFunction=*/pFunction == xbnullptr,
-                                                   &XboxDeclarationCount,
-                                                   &pCxbxVertexShader->Declaration);
-
-	// Create the vertex declaration
-	hRet = g_pD3DDevice->CreateVertexDeclaration(pRecompiledDeclaration, &pCxbxVertexShader->Declaration.pHostVertexDeclaration);
-	free(pRecompiledDeclaration);
-
-	DEBUG_D3DRESULT(hRet, "g_pD3DDevice->CreateVertexDeclaration");
-
-	if (FAILED(hRet)) {
-		// NOTE: This is a fatal error because it ALWAYS triggers a crash within DrawVertices if not set
-		CxbxKrnlCleanup("Failed to create Vertex Declaration");
-	}
-	hRet = g_pD3DDevice->SetVertexDeclaration(pCxbxVertexShader->Declaration.pHostVertexDeclaration);
-	DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetVertexDeclaration");
-	if (FAILED(hRet)) {
-		CxbxKrnlCleanup("Failed to set Vertex Declaration");
-	}
+	// Create the vertex declarations
+	pCxbxVertexShader->Declaration = GetHostVertexDeclarations((DWORD*)pDeclaration);
+	auto decl = pFunction == nullptr
+		? pCxbxVertexShader->Declaration.hostDeclarations.FixedFunction
+		: pCxbxVertexShader->Declaration.hostDeclarations.ShaderFunction;
+	g_pD3DDevice->SetVertexDeclaration(decl);
 
 	uint64_t      vertexShaderKey = 0;
 	DWORD         XboxFunctionSize = 0;
@@ -4245,9 +4303,7 @@ HRESULT WINAPI XTL::EMUPATCH(D3DDevice_CreateVertexShader)
 	pCxbxVertexShader->pXboxFunctionCopy = nullptr;
 	pCxbxVertexShader->XboxVertexShaderType = X_VST_NORMAL; // TODO : This can vary
 	pCxbxVertexShader->XboxNrAddressSlots = (XboxFunctionSize - sizeof(X_VSH_SHADER_HEADER)) / X_VSH_INSTRUCTION_SIZE_BYTES;
-	pCxbxVertexShader->Declaration.HostFVF = 0;
 	pCxbxVertexShader->VertexShaderKey = vertexShaderKey;
-	pCxbxVertexShader->Declaration.XboxDeclarationCount = XboxDeclarationCount;
 	// Save the status, to remove things later
 	// pCxbxVertexShader->XboxStatus = hRet; // Not even used by VshHandleIsValidShader()
 
@@ -6729,8 +6785,7 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_SetVertexShader)
 	} else {
 		hRet = g_pD3DDevice->SetVertexShader(nullptr);
 		DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetVertexShader");
-		hRet = g_pD3DDevice->SetFVF(Handle);
-		DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetFVF");
+		hRet = g_pD3DDevice->SetVertexDeclaration(GetHostVertexDeclarations(Handle).hostDeclarations.FixedFunction);
 	}
 
 	UpdateViewPortOffsetAndScaleConstants();
@@ -7939,10 +7994,11 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_DeleteVertexShader)
 		CxbxVertexShader *pCxbxVertexShader = GetCxbxVertexShader(Handle);
 		SetCxbxVertexShader(Handle, nullptr);
 
-		if (pCxbxVertexShader->Declaration.pHostVertexDeclaration) {
-			HRESULT hRet = pCxbxVertexShader->Declaration.pHostVertexDeclaration->Release();
-			DEBUG_D3DRESULT(hRet, "g_pD3DDevice->DeleteVertexShader(pHostVertexDeclaration)");
-		}
+		HRESULT hRet;
+		hRet = pCxbxVertexShader->Declaration.hostDeclarations.FixedFunction->Release();
+		DEBUG_D3DRESULT(hRet, "g_pD3DDevice->DeleteVertexShader(pHostVertexDeclaration)");
+		hRet = pCxbxVertexShader->Declaration.hostDeclarations.ShaderFunction->Release();
+		DEBUG_D3DRESULT(hRet, "g_pD3DDevice->DeleteVertexShader(pHostVertexDeclaration)");
 
 		// Release the host vertex shader
 		g_VertexShaderSource.ReleaseShader(pCxbxVertexShader->VertexShaderKey);

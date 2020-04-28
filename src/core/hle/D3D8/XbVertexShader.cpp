@@ -1191,11 +1191,10 @@ public:
 	}
 };
 
-D3DVERTEXELEMENT *EmuRecompileVshDeclaration
+D3DVERTEXELEMENT* EmuRecompileVshDeclaration
 (
     DWORD                *pXboxDeclaration,
     bool                  bIsFixedFunction,
-    DWORD                *pXboxDeclarationCount,
     CxbxVertexDeclaration *pCxbxVertexDeclaration
 )
 {
@@ -1203,9 +1202,95 @@ D3DVERTEXELEMENT *EmuRecompileVshDeclaration
 
 	D3DVERTEXELEMENT* pHostVertexElements = Converter.Convert(pXboxDeclaration, bIsFixedFunction, pCxbxVertexDeclaration);
 
-	*pXboxDeclarationCount = Converter.XboxDeclarationCount;
+	// ?
+	pCxbxVertexDeclaration->XboxDeclarationCount = Converter.XboxDeclarationCount;
 
     return pHostVertexElements;
+}
+
+std::array<DWORD, 20> EmuConvertFvfToXboxDeclaration(DWORD xboxFvf)
+{
+	// HACK: Convert the FVF to an Xbox vertex declaration
+	// So that we can reuse the XboxVertexDeclarationConverter logic...
+
+	// Define a large enough definition to contain all possible FVF types
+	// 20 is maximum possible size
+	std::array<DWORD, 20> fakeXboxVertexDeclaration = { 0 };
+	int index = 0;
+
+	using namespace XTL;
+
+	// Write the Stream Number (always 0 for FVF)
+	fakeXboxVertexDeclaration[index++] = X_D3DVSD_STREAM(0);
+
+	// Write Position
+	DWORD position = (g_Xbox_VertexShader_Handle & X_D3DFVF_POSITION_MASK);
+	if (position == X_D3DFVF_XYZRHW) {
+		// Pre-transformed position
+		fakeXboxVertexDeclaration[index++] = X_D3DVSD_REG(X_D3DVSDE_POSITION, X_D3DVSDT_FLOAT4);
+	}
+	else {
+		// Untransformed position
+		fakeXboxVertexDeclaration[index++] = X_D3DVSD_REG(X_D3DVSDE_POSITION, X_D3DVSDT_FLOAT3);
+
+		// Write Blend Weights (if any)
+		if (position == X_D3DFVF_XYZB1) {
+			fakeXboxVertexDeclaration[index++] = X_D3DVSD_REG(X_D3DVSDE_BLENDWEIGHT, X_D3DVSDT_FLOAT1);
+		}
+		else if (position == X_D3DFVF_XYZB2) {
+			fakeXboxVertexDeclaration[index++] = X_D3DVSD_REG(X_D3DVSDE_BLENDWEIGHT, X_D3DVSDT_FLOAT2);
+		}
+		else if (position == X_D3DFVF_XYZB3) {
+			fakeXboxVertexDeclaration[index++] = X_D3DVSD_REG(X_D3DVSDE_BLENDWEIGHT, X_D3DVSDT_FLOAT3);
+		}
+		else if (position == X_D3DFVF_XYZB4) {
+			fakeXboxVertexDeclaration[index++] = X_D3DVSD_REG(X_D3DVSDE_BLENDWEIGHT, X_D3DVSDT_FLOAT4);
+		}
+	}
+
+	// Write Normal, Diffuse, and Specular
+	if (g_Xbox_VertexShader_Handle & X_D3DFVF_NORMAL) {
+		fakeXboxVertexDeclaration[index++] = X_D3DVSD_REG(X_D3DVSDE_NORMAL, X_D3DVSDT_FLOAT3);
+	}
+	if (g_Xbox_VertexShader_Handle & X_D3DFVF_DIFFUSE) {
+		fakeXboxVertexDeclaration[index++] = X_D3DVSD_REG(X_D3DVSDE_DIFFUSE, X_D3DVSDT_D3DCOLOR);
+	}
+	if (g_Xbox_VertexShader_Handle & X_D3DFVF_SPECULAR) {
+		fakeXboxVertexDeclaration[index++] = X_D3DVSD_REG(X_D3DVSDE_SPECULAR, X_D3DVSDT_D3DCOLOR);
+	}
+
+	// Write Texture Coordinates
+	int textureCount = (g_Xbox_VertexShader_Handle & X_D3DFVF_TEXCOUNT_MASK) >> X_D3DFVF_TEXCOUNT_SHIFT;
+
+	// Safeguard, since the X_D3DFVF_TEXCOUNT bitfield could contain invalid values (5 up to 15)
+	if (textureCount > 4) {
+		textureCount = 4;
+		LOG_TEST_CASE("Texture count greater than 4: %d", textureCount);
+	}
+
+	for (int i = 0; i < textureCount; i++) {
+		int numberOfCoordinates = 0;
+
+		if ((g_Xbox_VertexShader_Handle & X_D3DFVF_TEXCOORDSIZE1(i)) == X_D3DFVF_TEXCOORDSIZE1(i)) {
+			numberOfCoordinates = X_D3DVSDT_FLOAT1;
+		}
+		if ((g_Xbox_VertexShader_Handle & X_D3DFVF_TEXCOORDSIZE2(i)) == X_D3DFVF_TEXCOORDSIZE2(i)) {
+			numberOfCoordinates = X_D3DVSDT_FLOAT2;
+		}
+		if ((g_Xbox_VertexShader_Handle & X_D3DFVF_TEXCOORDSIZE3(i)) == X_D3DFVF_TEXCOORDSIZE3(i)) {
+			numberOfCoordinates = X_D3DVSDT_FLOAT3;
+		}
+		if ((g_Xbox_VertexShader_Handle & X_D3DFVF_TEXCOORDSIZE4(i)) == X_D3DFVF_TEXCOORDSIZE4(i)) {
+			numberOfCoordinates = X_D3DVSDT_FLOAT4;
+		}
+
+		fakeXboxVertexDeclaration[index++] = X_D3DVSD_REG(X_D3DVSDE_TEXCOORD0 + i, numberOfCoordinates);
+	}
+
+	// Write Declaration End
+	fakeXboxVertexDeclaration[index++] = X_D3DVSD_END();
+
+	return fakeXboxVertexDeclaration;
 }
 
 extern void FreeVertexDynamicPatch(CxbxVertexShader *pVertexShader)
