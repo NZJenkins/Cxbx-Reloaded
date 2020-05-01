@@ -29,6 +29,7 @@
 #include <vector>
 #include <future>
 
+#include "Cxbx.h" // for xbnullptr
 #include "core\hle\D3D8\XbD3D8Types.h" // for X_VSH_MAX_ATTRIBUTES
 
 // Host vertex shader counts
@@ -81,8 +82,8 @@ typedef struct _CxbxVertexShader
 {
 	// These are the parameters given by the XBE,
 	// we save them to be able to return them when necessary.
-	DWORD* pXboxDeclarationCopy;
-	DWORD                 XboxDeclarationCount; // Xbox's number of DWORD-sized X_D3DVSD* tokens
+//	DWORD* pXboxDeclarationCopy;
+//	DWORD                 XboxDeclarationCount; // Xbox's number of DWORD-sized X_D3DVSD* tokens
 	DWORD                 XboxFunctionSize;
 	DWORD* pXboxFunctionCopy;
 	UINT                  XboxNrAddressSlots;
@@ -98,6 +99,16 @@ typedef struct _CxbxVertexShader
 	CxbxVertexShaderInfo  VertexShaderInfo;
 }
 CxbxVertexShader;
+
+class XboxVertexShaderConverter {
+public:
+	DWORD* g_Xbox_D3DDevice = xbnullptr; // TODO : Rename
+	DWORD* g_XboxAddr_pVertexShader = xbnullptr; // TODO : Rename
+
+	bool Init();
+};
+
+extern XboxVertexShaderConverter XboxVertexShaders;
 
 // recompile xbox vertex shader declaration
 extern D3DVERTEXELEMENT *EmuRecompileVshDeclaration

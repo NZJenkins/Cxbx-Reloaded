@@ -145,7 +145,7 @@ IDirect3DVertexShader* VertexShaderSource::GetShader(ShaderKey key)
 }
 
 // Release a shader. Doesn't actually release any resources for now
-void VertexShaderSource::ReleaseShader(ShaderKey key)
+void VertexShaderSource::ReleaseShader(ShaderKey key) // FIXME : With D3DDevice_DeleteVertexShader patch removed, call this otherwise?
 {
 	// For now, don't bother releasing any shaders
 	LazyVertexShader* pLazyShader;
