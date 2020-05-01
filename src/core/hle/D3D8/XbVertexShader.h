@@ -28,6 +28,7 @@
 #include <d3dcompiler.h>
 #include <vector>
 #include <future>
+#include <array>
 
 #include "core\hle\D3D8\XbD3D8Types.h" // for X_VSH_MAX_ATTRIBUTES
 
@@ -42,29 +43,13 @@ typedef struct _CxbxVertexShaderStreamElement
 {
 	UINT XboxType; // The stream element data types (xbox)
 	UINT XboxByteSize; // The stream element data sizes (xbox)
-	UINT HostByteSize; // The stream element data sizes (pc)
 }
 CxbxVertexShaderStreamElement;
 
-/* See host typedef struct _D3DVERTEXELEMENT9
-{
-	WORD    Stream;     // Stream index
-	WORD    Offset;     // Offset in the stream in bytes
-	BYTE    Type;       // Data type
-	BYTE    Method;     // Processing method
-	BYTE    Usage;      // Semantics
-	BYTE    UsageIndex; // Semantic index
-} D3DVERTEXELEMENT9, *LPD3DVERTEXELEMENT9;
-*/
-
 typedef struct _CxbxVertexShaderStreamInfo
 {
-	BOOL  NeedPatch;       // This is to know whether it's data which must be patched
-	BOOL DeclPosition;
-	WORD HostVertexStride;
 	DWORD NumberOfVertexElements;        // Number of the stream data types
-	WORD CurrentStreamNumber;
-	CxbxVertexShaderStreamElement VertexElements[X_VSH_MAX_ATTRIBUTES + 16]; // TODO : Why 16 extra host additions?)
+	CxbxVertexShaderStreamElement VertexElements[X_VSH_MAX_ATTRIBUTES];
 }
 CxbxVertexShaderStreamInfo;
 
@@ -74,8 +59,8 @@ typedef struct _CxbxVertexDeclaration
 	IDirect3DVertexDeclaration* pHostVertexDeclaration;
 	DWORD* pXboxDeclarationCopy;
 	DWORD  XboxDeclarationCount; // Xbox's number of DWORD-sized X_D3DVSD* tokens
-	UINT                       NumberOfVertexStreams; // The number of streams the vertex shader uses
-	bool vRegisterInDeclaration[X_VSH_MAX_ATTRIBUTES];
+	UINT NumberOfVertexStreams; // The number of streams the vertex shader uses
+	std::array<bool, X_VSH_MAX_ATTRIBUTES> vRegisterInDeclaration;
 }
 CxbxVertexDeclaration;
 
