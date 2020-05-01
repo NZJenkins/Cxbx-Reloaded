@@ -1016,6 +1016,20 @@ void SetFixedFunctionShader() {
 		if (hRet != D3D_OK) CxbxKrnlCleanup("creating FF shader failed");
 	}
 
+	// Activating the fixed function pipeline should reset the default
+	// frontface and backface COLOR/SPECULAR registers
+	// Unless they are part of the vertex declaration
+	// or corresponding persistent attribute flags are set
+	// TODO determine what data is part of the vertex declaration
+	// TODO support persistent attribute flags
+	// TODO use last values from previous processed vertex buffer
+	const float ColorBlack[4] = { 0, 0, 0, 0 };
+	const float ColorWhite[4] = { 1, 1, 1, 1 };
+	g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_ATTRDATA_BASE + XTL::X_D3DVSDE_DIFFUSE, ColorWhite, 1);
+	g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_ATTRDATA_BASE + XTL::X_D3DVSDE_SPECULAR, ColorBlack, 1);
+	g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_ATTRDATA_BASE + XTL::X_D3DVSDE_BACKDIFFUSE, ColorWhite, 1);
+	g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_ATTRDATA_BASE + XTL::X_D3DVSDE_BACKSPECULAR, ColorBlack, 1);
+
 	g_pD3DDevice->SetVertexShader(fvfShader);
 }
 
