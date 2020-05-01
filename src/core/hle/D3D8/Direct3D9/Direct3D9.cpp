@@ -7671,22 +7671,7 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_DeleteVertexShader)
 	CxbxImpl_DeleteVertexShader(Handle);
 }
 
-// ******************************************************************
-// * patch: D3DDevice_SelectVertexShaderDirect
-// ******************************************************************
-VOID WINAPI XTL::EMUPATCH(D3DDevice_SelectVertexShaderDirect)
-(
-    X_VERTEXATTRIBUTEFORMAT *pVAF,
-    DWORD                    Address
-)
-{
-	LOG_FUNC_BEGIN
-		LOG_FUNC_ARG(pVAF)
-		LOG_FUNC_ARG(Address)
-		LOG_FUNC_END;
 
-	CxbxImpl_SelectVertexShaderDirect(pVAF, Address);
-}
 
 // ******************************************************************
 // * patch: D3DDevice_GetShaderConstantMode
