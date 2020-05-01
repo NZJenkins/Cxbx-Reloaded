@@ -48,7 +48,6 @@ CxbxVertexShaderStreamElement;
 
 typedef struct _CxbxVertexShaderStreamInfo
 {
-	DWORD NumberOfVertexElements;        // Number of the stream data types
 	CxbxVertexShaderStreamElement VertexElements[X_VSH_MAX_ATTRIBUTES];
 }
 CxbxVertexShaderStreamInfo;

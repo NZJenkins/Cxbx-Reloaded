@@ -724,7 +724,97 @@ void ParseXboxVertexDeclaration
 
 CxbxVertexDeclaration ParseXboxFvfDeclaration(DWORD xboxFvf)
 {
-	
+	CxbxVertexDeclaration declaration = { 0 };
+	declaration.NumberOfVertexStreams = 1; // FVFs define a single stream (0)
+	auto pStream = &declaration.VertexStreams[0];
+	auto elements = pStream->VertexElements;
+
+	using namespace XTL;
+
+	// Assign vertex elements
+	CxbxVertexShaderStreamElement* pEl;
+
+	// Position
+	// This is always passed
+	pEl = &elements[X_D3DVSDE_POSITION];
+	DWORD position = (g_Xbox_VertexShader_Handle & X_D3DFVF_POSITION_MASK);
+	if (position == X_D3DFVF_XYZRHW) {
+		pEl->XboxType = X_D3DVSDT_FLOAT4;
+		pEl->XboxByteSize = sizeof(float) * 4;
+	}
+	else {
+		pEl->XboxType = X_D3DVSDT_FLOAT3;
+		pEl->XboxByteSize = sizeof(float) * 3;
+	}
+
+	// Write Blend Weights
+	pEl = &elements[X_D3DVSDE_BLENDWEIGHT];
+	if (position == X_D3DFVF_XYZB1) {
+		pEl->XboxType = X_D3DVSDT_FLOAT1;
+		pEl->XboxByteSize = sizeof(float) * 1;
+	}
+	else if (position == X_D3DFVF_XYZB2) {
+		pEl->XboxType = X_D3DVSDT_FLOAT2;
+		pEl->XboxByteSize = sizeof(float) * 2;
+	}
+	else if (position == X_D3DFVF_XYZB3) {
+		pEl->XboxType = X_D3DVSDT_FLOAT3;
+		pEl->XboxByteSize = sizeof(float) * 3;
+	}
+	else if (position == X_D3DFVF_XYZB4) {
+		pEl->XboxType = X_D3DVSDT_FLOAT4;
+		pEl->XboxByteSize = sizeof(float) * 4;
+	}
+
+	// Write Normal, Diffuse, and Specular
+	if (g_Xbox_VertexShader_Handle & X_D3DFVF_NORMAL) {
+		pEl = &elements[X_D3DVSDE_NORMAL];
+		pEl->XboxType =X_D3DVSDT_FLOAT3;
+		pEl->XboxByteSize = sizeof(float) * 3;
+	}
+	if (g_Xbox_VertexShader_Handle & X_D3DFVF_DIFFUSE) {
+		pEl = &elements[X_D3DVSDE_DIFFUSE];
+		pEl->XboxType = X_D3DVSDT_D3DCOLOR;
+		pEl->XboxByteSize = sizeof(DWORD) * 1;
+	}
+	if (g_Xbox_VertexShader_Handle & X_D3DFVF_SPECULAR) {
+		pEl = &elements[X_D3DVSDE_SPECULAR];
+		pEl->XboxType = X_D3DVSDT_D3DCOLOR;
+		pEl->XboxByteSize = sizeof(DWORD) * 1;
+	}
+
+	// Write Texture Coordinates
+	int textureCount = (g_Xbox_VertexShader_Handle & X_D3DFVF_TEXCOUNT_MASK) >> X_D3DFVF_TEXCOUNT_SHIFT;
+	assert(textureCount <= 4); // Safeguard, since the X_D3DFVF_TEXCOUNT bitfield could contain invalid values (5 up to 15)
+	for (int i = 0; i < textureCount; i++) {
+		int numberOfCoordinates = 0;
+
+		if ((g_Xbox_VertexShader_Handle & X_D3DFVF_TEXCOORDSIZE1(i)) == (DWORD)X_D3DFVF_TEXCOORDSIZE1(i)) {
+			numberOfCoordinates = X_D3DVSDT_FLOAT1;
+		}
+		else if ((g_Xbox_VertexShader_Handle & X_D3DFVF_TEXCOORDSIZE2(i)) == (DWORD)X_D3DFVF_TEXCOORDSIZE2(i)) {
+			numberOfCoordinates = X_D3DVSDT_FLOAT2;
+		}
+		else if ((g_Xbox_VertexShader_Handle & X_D3DFVF_TEXCOORDSIZE3(i)) == (DWORD)X_D3DFVF_TEXCOORDSIZE3(i)) {
+			numberOfCoordinates = X_D3DVSDT_FLOAT3;
+		}
+		else if ((g_Xbox_VertexShader_Handle & X_D3DFVF_TEXCOORDSIZE4(i)) == (DWORD)X_D3DFVF_TEXCOORDSIZE4(i)) {
+			numberOfCoordinates = X_D3DVSDT_FLOAT4;
+		}
+
+		pEl = &elements[X_D3DVSDE_TEXCOORD0 + i];
+		pEl->XboxType = numberOfCoordinates;
+		pEl->XboxByteSize = sizeof(DWORD) * 1;
+	}
+
+	// For each FVF register
+	for (size_t i = 0; i <= X_D3DVSDE_TEXCOORD3; i++) {
+		// With data associated with it
+		if (elements[i].XboxByteSize != 0) {
+			// Flag as in the declaration
+			declaration.vRegisterInDeclaration[i] = true;
+		}
+	}
 }
 
 extern void FreeVertexDynamicPatch(CxbxVertexShader *pVertexShader)
