@@ -31,10 +31,10 @@
 #include "core\kernel\memory-manager\VMManager.h"
 #include "common\util\hasher.h"
 #include "core\kernel\support\Emu.h"
-#include "core\hle\D3D8\Direct3D9\Direct3D9.h" // For g_pD3DDevice
+#include "core\hle\D3D8\Direct3D9\Direct3D9.h" // For g_pD3DDevice, g_pXbox_Texture, g_pXbox_RenderTarget, g_pXbox_BackBufferSurface, g_Xbox_VertexShader_Handle
 #include "core\hle\D3D8\Direct3D9\WalkIndexBuffer.h" // for WalkIndexBuffer
 #include "core\hle\D3D8\ResourceTracker.h"
-#include "core\hle\D3D8\XbPushBuffer.h" // for DxbxFVF_GetNumberOfTextureCoordinates
+#include "core\hle\D3D8\XbPushBuffer.h" // for XboxFVF_GetNumberOfTextureCoordinates
 #include "core\hle\D3D8\XbVertexBuffer.h"
 #include "core\hle\D3D8\XbConvert.h"
 
@@ -61,10 +61,40 @@ XTL::X_STREAMINPUT g_Xbox_SetStreamSource[X_VSH_MAX_STREAMS] = { 0 }; // Note : 
 
 extern XTL::X_D3DSurface* g_pXbox_RenderTarget;
 extern XTL::X_D3DSurface* g_pXbox_BackBufferSurface;
-void *GetDataFromXboxResource(XTL::X_D3DResource *pXboxResource);
-bool GetHostRenderTargetDimensions(DWORD* pHostWidth, DWORD* pHostHeight, IDirect3DSurface* pHostRenderTarget = nullptr);
-uint32_t GetPixelContainerWidth(XTL::X_D3DPixelContainer* pPixelContainer);
-uint32_t GetPixelContainerHeight(XTL::X_D3DPixelContainer* pPixelContainer);
+
+// Resource related functions, declared in Direct3D9.cpp :
+extern void *GetDataFromXboxResource(XTL::X_D3DResource *pXboxResource);
+extern bool GetHostRenderTargetDimensions(DWORD* pHostWidth, DWORD* pHostHeight, IDirect3DSurface* pHostRenderTarget = nullptr);
+extern uint32_t GetPixelContainerWidth(XTL::X_D3DPixelContainer* pPixelContainer);
+extern uint32_t GetPixelContainerHeight(XTL::X_D3DPixelContainer* pPixelContainer);
+
+// implemented in XbVertexShader.cpp
+extern void CxbxUpdateActiveVertexShader(unsigned VerticesInBuffer);
+extern XTL::X_STREAMINPUT& GetXboxVertexStreamInput(unsigned StreamNumber);
+
+// Returns the Xbox vertex stride from the stream input values that are active on the given stream number.
+unsigned GetXboxVertexStreamStride(unsigned StreamNumber)
+{
+	return GetXboxVertexStreamInput(StreamNumber).Stride;
+}
+
+// Returns the Xbox vertex buffer from the stream input values that are active on the given stream number.
+XTL::X_D3DVertexBuffer* GetXboxVertexStreamVertexBuffer(unsigned StreamNumber)
+{
+	return GetXboxVertexStreamInput(StreamNumber).VertexBuffer;
+}
+
+// Returns a CPU-readable Xbox data pointer from the given vertex buffer.
+uint8_t* GetXboxVertexBufferData(XTL::X_D3DVertexBuffer *pXboxVertexBuffer)
+{
+	return (uint8_t*)GetDataFromXboxResource(pXboxVertexBuffer);
+}
+
+// Returns a CPU-readable Xbox data pointer from the vertex buffer that's active on the given stream number.
+uint8_t* GetXboxVertexStreamData(unsigned StreamNumber)
+{
+	return GetXboxVertexBufferData(GetXboxVertexStreamVertexBuffer(StreamNumber));
+}
 
 void CxbxPatchedStream::Activate(CxbxDrawContext *pDrawContext, UINT uiStream) const
 {
@@ -105,6 +135,7 @@ CxbxPatchedStream::~CxbxPatchedStream()
     pCachedHostVertexStreamZeroData = nullptr;
 
     if (pCachedHostVertexBuffer != nullptr) {
+        // TODO : We could re-use this buffer, if it's large enough...
         pCachedHostVertexBuffer->Release();
         pCachedHostVertexBuffer = nullptr;
     }
@@ -294,7 +325,7 @@ void CxbxVertexBufferConverter::ConvertStream
 		uiHostVertexStride = (bNeedVertexPatching) ? pVertexShaderStreamInfo->HostVertexStride : uiXboxVertexStride;
 		dwHostVertexDataSize = uiVertexCount * uiHostVertexStride;
 	} else {
-		XTL::X_D3DVertexBuffer *pXboxVertexBuffer = g_Xbox_SetStreamSource[uiStream].VertexBuffer;
+		XTL::X_D3DVertexBuffer *pXboxVertexBuffer = GetXboxVertexStreamVertexBuffer(uiStream);
         pXboxVertexData = (uint8_t*)GetDataFromXboxResource(pXboxVertexBuffer);
 		if (pXboxVertexData == xbnullptr) {
 			HRESULT hRet = g_pD3DDevice->SetStreamSource(
@@ -310,7 +341,7 @@ void CxbxVertexBufferConverter::ConvertStream
 			return;
 		}
 
-		uiXboxVertexStride = g_Xbox_SetStreamSource[uiStream].Stride;
+		uiXboxVertexStride = GetXboxVertexStreamStride(uiStream);
         // Set a new (exact) vertex count
 		uiVertexCount = pDrawContext->VerticesInBuffer;
 		// Dxbx note : Don't overwrite pDrawContext.dwVertexCount with uiVertexCount, because an indexed draw
@@ -761,7 +792,10 @@ void CxbxVertexBufferConverter::Apply(CxbxDrawContext *pDrawContext)
 
     m_pVertexShaderInfo = nullptr;
     if (VshHandleIsVertexShader(g_Xbox_VertexShader_Handle)) {
-        m_pVertexShaderInfo = &(GetCxbxVertexShader(g_Xbox_VertexShader_Handle)->VertexShaderInfo);
+		CxbxVertexShader* vsh = GetCxbxVertexShader(g_Xbox_VertexShader_Handle); // Not GetCxbxVertexShaderInfo, which returns NULL when no stream NeedPatch
+		if (vsh != nullptr) {
+			m_pVertexShaderInfo = &(vsh->VertexShaderInfo);
+		}
     }
 
 	// If we are drawing from an offset, we know that the vertex count must have
@@ -782,6 +816,8 @@ void CxbxVertexBufferConverter::Apply(CxbxDrawContext *pDrawContext)
 		if (pDrawContext->VerticesInBuffer < dwHighestVertexCount)
 			pDrawContext->VerticesInBuffer = dwHighestVertexCount;
 	}
+
+	CxbxUpdateActiveVertexShader(pDrawContext->VerticesInBuffer);
 
     // Get the number of streams
     m_uiNbrStreams = GetNbrStreams(pDrawContext);
@@ -978,7 +1014,7 @@ VOID EmuFlushIVB()
 
 	if (bFVF) {
 		g_pD3DDevice->SetVertexShader(nullptr);
-		hRet = g_pD3DDevice->SetFVF(dwCurFVF);
+		hRet = g_pD3DDevice->SetFVF(dwCurFVF); // Note : No comversion needed since host FVF are compatible with Xbox FVF
 		//DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetVertexShader");
 	}
 
