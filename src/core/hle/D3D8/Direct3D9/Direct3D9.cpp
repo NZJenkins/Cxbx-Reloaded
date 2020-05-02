@@ -296,7 +296,7 @@ g_EmuCDPD = {0};
     XB_MACRO(VOID,               WINAPI,     D3DDevice_SetTexture,              (DWORD, XTL::X_D3DBaseTexture*)                                                    );  \
     XB_MACRO(VOID,               WINAPI,     D3DDevice_SetTexture_4,            (XTL::X_D3DBaseTexture*)                                                           );  \
     XB_MACRO(VOID,               WINAPI,     D3DDevice_SetVertexShader,         (DWORD)                                                                            );  \
-  /*XB_MACRO(VOID,               WINAPI,     D3DDevice_SetVertexShaderInput,    (DWORD, UINT, XTL::X_STREAMINPUT*)                                                 );*/\
+    XB_MACRO(VOID,               WINAPI,     D3DDevice_SetVertexShaderInput,    (DWORD, UINT, XTL::X_STREAMINPUT*)                                                 );  \
     XB_MACRO(VOID,               WINAPI,     D3DDevice_SetViewport,             (CONST XTL::X_D3DVIEWPORT8*)                                                       );  \
     XB_MACRO(VOID,               WINAPI,     D3D_DestroyResource,               (XTL::X_D3DResource*)                                                              );  \
     XB_MACRO(VOID,               WINAPI,     D3D_DestroyResource__LTCG,         (VOID)                                                                             );  \
@@ -7736,50 +7736,6 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_GetVertexShaderConstant)
 }
 
 // ******************************************************************
-// * patch: D3DDevice_SetVertexShaderInputDirect
-// ******************************************************************
-VOID WINAPI XTL::EMUPATCH(D3DDevice_SetVertexShaderInputDirect)
-(
-    X_VERTEXATTRIBUTEFORMAT *pVAF,
-    UINT                     StreamCount,
-    X_STREAMINPUT           *pStreamInputs
-)
-{
-	LOG_FUNC_BEGIN
-		LOG_FUNC_ARG(pVAF)
-		LOG_FUNC_ARG(StreamCount)
-		LOG_FUNC_ARG(pStreamInputs)
-		LOG_FUNC_END;
-
-	// If pVAF is given, it's copied into a global Xbox VertexBuffer struct and
-	// D3DDevice_SetVertexShaderInput is called with Handle set to that address, or-ed with 1 (X_D3DFVF_RESERVED0)
-	// Otherwise, D3DDevice_SetVertexShaderInput is called with Handle 0.
-
-    LOG_UNIMPLEMENTED(); 
-}
-
-// ******************************************************************
-// * patch: D3DDevice_GetVertexShaderInput
-// ******************************************************************
-HRESULT WINAPI XTL::EMUPATCH(D3DDevice_GetVertexShaderInput)
-(
-    DWORD              *pHandle,
-    UINT               *pStreamCount,
-    X_STREAMINPUT      *pStreamInputs
-)
-{
-	LOG_FUNC_BEGIN
-		LOG_FUNC_ARG(pHandle)
-		LOG_FUNC_ARG(pStreamCount)
-		LOG_FUNC_ARG(pStreamInputs)
-		LOG_FUNC_END;
-
-    LOG_UNIMPLEMENTED(); 
-
-    return 0;
-}
-
-// ******************************************************************
 // * patch: D3DDevice_SetVertexShaderInput
 // ******************************************************************
 VOID WINAPI XTL::EMUPATCH(D3DDevice_SetVertexShaderInput)
@@ -7805,7 +7761,13 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_SetVertexShaderInput)
 	// each vertex attribute (as defined in the given VertexShader.VertexAttribute.Slots[]) to read
 	// the attribute data from the pStreamInputs[slot].VertexBuffer + pStreamInputs[slot].Offset + VertexShader.VertexAttribute.Slots[slot].Offset
 
+	LOG_TEST_CASE("SetVertexShaderInput");
+	// Test-case : PushBuffer XDK sample
+
 	CxbxImpl_SetVertexShaderInput(Handle, StreamCount, pStreamInputs);
+
+	// Call trampoline
+	XB_TRMP(D3DDevice_SetVertexShaderInput)(Handle, StreamCount, pStreamInputs);
 }
 
 // ******************************************************************
