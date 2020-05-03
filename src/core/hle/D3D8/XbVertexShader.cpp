@@ -730,76 +730,80 @@ CxbxVertexDeclaration ParseXboxFvfDeclaration(DWORD xboxFvf)
 	auto elements = pStream->VertexElements;
 
 	using namespace XTL;
+	static DWORD X_D3DVSDT_FLOAT[] = { 0, X_D3DVSDT_FLOAT1, X_D3DVSDT_FLOAT2, X_D3DVSDT_FLOAT3, X_D3DVSDT_FLOAT4 };
+
+	// Position & Blendweights
+	int nrPositionFloats = 3;
+	int nrBlendWeights = 0;
+	DWORD position = (xboxFvf & X_D3DFVF_POSITION_MASK);
+	switch (position) {
+	case 0: nrPositionFloats = 0; LOG_TEST_CASE("FVF without position"); break; // Note : Remove logging if this occurs often
+	case X_D3DFVF_XYZ: /*nrPositionFloats is set to 3 by default*/ break;
+	case X_D3DFVF_XYZRHW: nrPositionFloats = 4; break;
+	case X_D3DFVF_XYZB1: nrBlendWeights = 1; break;
+	case X_D3DFVF_XYZB2: nrBlendWeights = 2; break;
+	case X_D3DFVF_XYZB3: nrBlendWeights = 3; break;
+	case X_D3DFVF_XYZB4: nrBlendWeights = 4; break;
+	case X_D3DFVF_POSITION_MASK: LOG_TEST_CASE("FVF invalid (5th blendweight?)"); break;
+	DEFAULT_UNREACHABLE;
+	}
 
 	// Assign vertex elements
 	CxbxVertexShaderStreamElement* pEl;
 
-	// Position
-	// This is always passed
-	pEl = &elements[X_D3DVSDE_POSITION];
-	DWORD position = (g_Xbox_VertexShader_Handle & X_D3DFVF_POSITION_MASK);
-	if (position == X_D3DFVF_XYZRHW) {
-		pEl->XboxType = X_D3DVSDT_FLOAT4;
-		pEl->XboxByteSize = sizeof(float) * 4;
-	}
-	else {
-		pEl->XboxType = X_D3DVSDT_FLOAT3;
-		pEl->XboxByteSize = sizeof(float) * 3;
+	if (nrPositionFloats > 0) {
+		// Write Position
+		pEl = &elements[X_D3DVSDE_POSITION];
+		pEl->XboxType = X_D3DVSDT_FLOAT[nrPositionFloats];
+		pEl->XboxByteSize = sizeof(float) * nrPositionFloats;
 	}
 
-	// Write Blend Weights
-	pEl = &elements[X_D3DVSDE_BLENDWEIGHT];
-	if (position == X_D3DFVF_XYZB1) {
-		pEl->XboxType = X_D3DVSDT_FLOAT1;
-		pEl->XboxByteSize = sizeof(float) * 1;
-	}
-	else if (position == X_D3DFVF_XYZB2) {
-		pEl->XboxType = X_D3DVSDT_FLOAT2;
-		pEl->XboxByteSize = sizeof(float) * 2;
-	}
-	else if (position == X_D3DFVF_XYZB3) {
-		pEl->XboxType = X_D3DVSDT_FLOAT3;
-		pEl->XboxByteSize = sizeof(float) * 3;
-	}
-	else if (position == X_D3DFVF_XYZB4) {
-		pEl->XboxType = X_D3DVSDT_FLOAT4;
-		pEl->XboxByteSize = sizeof(float) * 4;
+	if (nrBlendWeights > 0) {
+		// Write Blend Weights
+		pEl = &elements[X_D3DVSDE_BLENDWEIGHT];
+		pEl->XboxType = X_D3DVSDT_FLOAT[nrBlendWeights];
+		pEl->XboxByteSize = sizeof(float) * nrBlendWeights;
 	}
 
 	// Write Normal, Diffuse, and Specular
-	if (g_Xbox_VertexShader_Handle & X_D3DFVF_NORMAL) {
-		pEl = &elements[X_D3DVSDE_NORMAL];
-		pEl->XboxType =X_D3DVSDT_FLOAT3;
-		pEl->XboxByteSize = sizeof(float) * 3;
+	if (xboxFvf & X_D3DFVF_NORMAL) {
+		if (position == X_D3DFVF_XYZRHW) {
+			LOG_TEST_CASE("X_D3DFVF_NORMAL shouldn't use X_D3DFVF_XYZRHW");
+		} else {
+			pEl = &elements[X_D3DVSDE_NORMAL];
+			pEl->XboxType = X_D3DVSDT_FLOAT[3];
+			pEl->XboxByteSize = sizeof(float) * 3;
+		}
 	}
-	if (g_Xbox_VertexShader_Handle & X_D3DFVF_DIFFUSE) {
+	if (xboxFvf & X_D3DFVF_DIFFUSE) {
 		pEl = &elements[X_D3DVSDE_DIFFUSE];
 		pEl->XboxType = X_D3DVSDT_D3DCOLOR;
 		pEl->XboxByteSize = sizeof(DWORD) * 1;
 	}
-	if (g_Xbox_VertexShader_Handle & X_D3DFVF_SPECULAR) {
+	if (xboxFvf & X_D3DFVF_SPECULAR) {
 		pEl = &elements[X_D3DVSDE_SPECULAR];
 		pEl->XboxType = X_D3DVSDT_D3DCOLOR;
 		pEl->XboxByteSize = sizeof(DWORD) * 1;
 	}
 
 	// Write Texture Coordinates
-	int textureCount = (g_Xbox_VertexShader_Handle & X_D3DFVF_TEXCOUNT_MASK) >> X_D3DFVF_TEXCOUNT_SHIFT;
+	int textureCount = (xboxFvf & X_D3DFVF_TEXCOUNT_MASK) >> X_D3DFVF_TEXCOUNT_SHIFT;
 	assert(textureCount <= 4); // Safeguard, since the X_D3DFVF_TEXCOUNT bitfield could contain invalid values (5 up to 15)
 	for (int i = 0; i < textureCount; i++) {
 		int numberOfCoordinates = 0;
-		auto FVFTextureFormat = (g_Xbox_VertexShader_Handle >> X_D3DFVF_TEXCOORDSIZE_SHIFT(i)) & 0x3;
+		auto FVFTextureFormat = (xboxFvf >> X_D3DFVF_TEXCOORDSIZE_SHIFT(i)) & 0x003;
 		switch (FVFTextureFormat) {
-		case X_D3DFVF_TEXTUREFORMAT1: numberOfCoordinates = X_D3DVSDT_FLOAT1; break;
-		case X_D3DFVF_TEXTUREFORMAT2: numberOfCoordinates = X_D3DVSDT_FLOAT2; break;
-		case X_D3DFVF_TEXTUREFORMAT3: numberOfCoordinates = X_D3DVSDT_FLOAT3; break;
-		case X_D3DFVF_TEXTUREFORMAT4: numberOfCoordinates = X_D3DVSDT_FLOAT4; break;
+		case X_D3DFVF_TEXTUREFORMAT1: numberOfCoordinates = 1; break;
+		case X_D3DFVF_TEXTUREFORMAT2: numberOfCoordinates = 2; break;
+		case X_D3DFVF_TEXTUREFORMAT3: numberOfCoordinates = 3; break;
+		case X_D3DFVF_TEXTUREFORMAT4: numberOfCoordinates = 4; break;
 		DEFAULT_UNREACHABLE;
 		}
 
+		assert(numberOfCoordinates > 0);
 		pEl = &elements[X_D3DVSDE_TEXCOORD0 + i];
-		pEl->XboxType = numberOfCoordinates;
-		pEl->XboxByteSize = sizeof(DWORD) * 1;
+		pEl->XboxType = X_D3DVSDT_FLOAT[numberOfCoordinates];
+		pEl->XboxByteSize = sizeof(float) * numberOfCoordinates;
 	}
 
 	// For each FVF register
