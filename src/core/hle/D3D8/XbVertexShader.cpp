@@ -788,18 +788,13 @@ CxbxVertexDeclaration ParseXboxFvfDeclaration(DWORD xboxFvf)
 	assert(textureCount <= 4); // Safeguard, since the X_D3DFVF_TEXCOUNT bitfield could contain invalid values (5 up to 15)
 	for (int i = 0; i < textureCount; i++) {
 		int numberOfCoordinates = 0;
-
-		if ((g_Xbox_VertexShader_Handle & X_D3DFVF_TEXCOORDSIZE1(i)) == (DWORD)X_D3DFVF_TEXCOORDSIZE1(i)) {
-			numberOfCoordinates = X_D3DVSDT_FLOAT1;
-		}
-		else if ((g_Xbox_VertexShader_Handle & X_D3DFVF_TEXCOORDSIZE2(i)) == (DWORD)X_D3DFVF_TEXCOORDSIZE2(i)) {
-			numberOfCoordinates = X_D3DVSDT_FLOAT2;
-		}
-		else if ((g_Xbox_VertexShader_Handle & X_D3DFVF_TEXCOORDSIZE3(i)) == (DWORD)X_D3DFVF_TEXCOORDSIZE3(i)) {
-			numberOfCoordinates = X_D3DVSDT_FLOAT3;
-		}
-		else if ((g_Xbox_VertexShader_Handle & X_D3DFVF_TEXCOORDSIZE4(i)) == (DWORD)X_D3DFVF_TEXCOORDSIZE4(i)) {
-			numberOfCoordinates = X_D3DVSDT_FLOAT4;
+		auto FVFTextureFormat = (g_Xbox_VertexShader_Handle >> X_D3DFVF_TEXCOORDSIZE_SHIFT(i)) & 0x3;
+		switch (FVFTextureFormat) {
+		case X_D3DFVF_TEXTUREFORMAT1: numberOfCoordinates = X_D3DVSDT_FLOAT1; break;
+		case X_D3DFVF_TEXTUREFORMAT2: numberOfCoordinates = X_D3DVSDT_FLOAT2; break;
+		case X_D3DFVF_TEXTUREFORMAT3: numberOfCoordinates = X_D3DVSDT_FLOAT3; break;
+		case X_D3DFVF_TEXTUREFORMAT4: numberOfCoordinates = X_D3DVSDT_FLOAT4; break;
+		DEFAULT_UNREACHABLE;
 		}
 
 		pEl = &elements[X_D3DVSDE_TEXCOORD0 + i];
