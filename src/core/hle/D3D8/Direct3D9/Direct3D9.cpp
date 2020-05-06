@@ -295,7 +295,7 @@ g_EmuCDPD = {0};
     XB_MACRO(VOID,               WINAPI,     D3DDevice_SetStreamSource_8,       (XTL::X_D3DVertexBuffer*, UINT)                                                    );  \
     XB_MACRO(VOID,               WINAPI,     D3DDevice_SetTexture,              (DWORD, XTL::X_D3DBaseTexture*)                                                    );  \
     XB_MACRO(VOID,               WINAPI,     D3DDevice_SetTexture_4,            (XTL::X_D3DBaseTexture*)                                                           );  \
-  /*XB_MACRO(VOID,               WINAPI,     D3DDevice_SetVertexShader,         (DWORD)                                                                            );*/\
+    XB_MACRO(VOID,               WINAPI,     D3DDevice_SetVertexShader,         (DWORD)                                                                            );  \
   /*XB_MACRO(VOID,               WINAPI,     D3DDevice_SetVertexShaderInput,    (DWORD, UINT, XTL::X_STREAMINPUT*)                                                 );*/\
     XB_MACRO(VOID,               WINAPI,     D3DDevice_SetViewport,             (CONST XTL::X_D3DVIEWPORT8*)                                                       );  \
     XB_MACRO(VOID,               WINAPI,     D3D_DestroyResource,               (XTL::X_D3DResource*)                                                              );  \
@@ -6464,6 +6464,9 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_SetVertexShader)
 )
 {
 	LOG_FUNC_ONE_ARG(Handle);
+
+	if (XB_TRMP(D3DDevice_SetVertexShader))
+		XB_TRMP(D3DDevice_SetVertexShader)(Handle);
 
 	CxbxImpl_SetVertexShader(Handle);
 
