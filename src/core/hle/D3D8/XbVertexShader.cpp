@@ -356,16 +356,16 @@ private:
 	{
 		UsageIndex = 0;
 		switch (VertexRegister) {
-			case XTL::X_D3DVSDE_POSITION    /*= 0*/: return (pRecompiled->Type == D3DDECLTYPE_FLOAT4) ? D3DDECLUSAGE_POSITIONT : D3DDECLUSAGE_POSITION;
-			case XTL::X_D3DVSDE_BLENDWEIGHT /*= 1*/: return D3DDECLUSAGE_BLENDWEIGHT;
-			case XTL::X_D3DVSDE_NORMAL      /*= 2*/: return D3DDECLUSAGE_NORMAL;
-			case XTL::X_D3DVSDE_DIFFUSE     /*= 3*/: return D3DDECLUSAGE_COLOR;
+			case XTL::X_D3DVSDE_POSITION    /*= 0*/:                 return (pRecompiled->Type == D3DDECLTYPE_FLOAT4) ? D3DDECLUSAGE_POSITIONT : D3DDECLUSAGE_POSITION;
+			case XTL::X_D3DVSDE_BLENDWEIGHT /*= 1*/:                 return D3DDECLUSAGE_BLENDWEIGHT;
+			case XTL::X_D3DVSDE_NORMAL      /*= 2*/:                 return D3DDECLUSAGE_NORMAL;
+			case XTL::X_D3DVSDE_DIFFUSE     /*= 3*/:                 return D3DDECLUSAGE_COLOR;
 			case XTL::X_D3DVSDE_SPECULAR    /*= 4*/: UsageIndex = 1; return D3DDECLUSAGE_COLOR;
-			case XTL::X_D3DVSDE_FOG         /*= 5*/: return D3DDECLUSAGE_FOG;
-			case XTL::X_D3DVSDE_POINTSIZE   /*= 6*/: return D3DDECLUSAGE_PSIZE;
-			case XTL::X_D3DVSDE_BACKDIFFUSE /*= 7*/: UsageIndex = 2; return D3DDECLUSAGE_COLOR;
-			case XTL::X_D3DVSDE_BACKSPECULAR/*= 8*/: UsageIndex = 3; return D3DDECLUSAGE_COLOR;
-			case XTL::X_D3DVSDE_TEXCOORD0   /*= 9*/: return D3DDECLUSAGE_TEXCOORD;
+			case XTL::X_D3DVSDE_FOG         /*= 5*/:                 return D3DDECLUSAGE_FOG;  // Never in xboxFVF
+			case XTL::X_D3DVSDE_POINTSIZE   /*= 6*/:                 return D3DDECLUSAGE_PSIZE; // Never in xboxFVF
+			case XTL::X_D3DVSDE_BACKDIFFUSE /*= 7*/: UsageIndex = 2; return D3DDECLUSAGE_COLOR; // Never in xboxFVF
+			case XTL::X_D3DVSDE_BACKSPECULAR/*= 8*/: UsageIndex = 3; return D3DDECLUSAGE_COLOR; // Never in xboxFVF
+			case XTL::X_D3DVSDE_TEXCOORD0   /*= 9*/:                 return D3DDECLUSAGE_TEXCOORD;
 			case XTL::X_D3DVSDE_TEXCOORD1   /*=10*/: UsageIndex = 1; return D3DDECLUSAGE_TEXCOORD;
 			case XTL::X_D3DVSDE_TEXCOORD2   /*=11*/: UsageIndex = 2; return D3DDECLUSAGE_TEXCOORD;
 			case XTL::X_D3DVSDE_TEXCOORD3   /*=12*/: UsageIndex = 3; return D3DDECLUSAGE_TEXCOORD;
@@ -1139,17 +1139,7 @@ void CxbxImpl_LoadVertexShader(DWORD Handle, DWORD Address)
 
 	XTL::X_D3DVertexShader* pXboxVertexShader = VshHandleToXboxVertexShader(Handle);
 
-	// Note : FunctionData[0] might be a X_VSH_SHADER_HEADER, but is often equal to zero?
-	if (pXboxVertexShader->FunctionData[0] != 0) {
-		// If set, check if it resembles a regular shader header or not (not really needed, but why not, eh?!) :
-		auto shaderHeader = *((XTL::X_VSH_SHADER_HEADER*) & pXboxVertexShader->FunctionData[0]);
-		if (shaderHeader.Version != VERSION_XVS)
-			LOG_TEST_CASE("Non-regular (state or read/write) shader detected!");
-		if (shaderHeader.NumInst > 2000)
-			LOG_TEST_CASE("Extremely long shader detected!");
-	}
-
-	auto pNV2ATokens = &pXboxVertexShader->FunctionData[1];
+	auto pNV2ATokens = &pXboxVertexShader->FunctionData[0];
 	DWORD NrTokens = pXboxVertexShader->TotalSize;
 
 #if 1 // TODO : Remove dirty hack (?once CreateVertexShader trampolines to Xbox code that sets TotalSize correctly?) :
@@ -1211,9 +1201,23 @@ void CxbxImpl_SetVertexShader(DWORD Handle)
 
 	g_Xbox_VertexShader_Handle = Handle;
 
+	XTL::X_D3DVertexShader* pXboxVertexShader;
 	if (VshHandleIsVertexShader(Handle)) {
-		CxbxImpl_LoadVertexShader(Handle, 0);
-		CxbxImpl_SelectVertexShader(Handle, 0);
+		pXboxVertexShader = VshHandleToXboxVertexShader(Handle);
+		if (pXboxVertexShader->Flags & X_VERTEXSHADER_FLAG_PROGRAM) {
+#if 0 // Since the D3DDevice_SetVertexShader patch already called it's trampoline, these calls have already been executed :
+			CxbxImpl_LoadVertexShader(Handle, 0);
+			CxbxImpl_SelectVertexShader(Handle, 0);
+#endif
+		}
+		else {
+			if (pXboxVertexShader->Flags & X_VERTEXSHADER_FLAG_PASSTHROUGH) {
+				LOG_TEST_CASE("TODO : Select Pass-through program HLSL Shader");
+			}
+			else {
+				LOG_TEST_CASE("TODO : Select Fixed Function HLSL Shader");
+			}
+		}
 	}
 	else {
 		hRet = g_pD3DDevice->SetVertexShader(nullptr);
@@ -1243,6 +1247,7 @@ void CxbxImpl_DeleteVertexShader(DWORD Handle)
 		if (pCxbxVertexShader->Declaration.pHostVertexDeclaration) {
 			HRESULT hRet = pCxbxVertexShader->Declaration.pHostVertexDeclaration->Release();
 			DEBUG_D3DRESULT(hRet, "g_pD3DDevice->DeleteVertexShader(pHostVertexDeclaration)");
+			pCxbxVertexShader->Declaration.pHostVertexDeclaration = nullptr;
 		}
 
 		// Release the host vertex shader
@@ -1290,6 +1295,7 @@ void CxbxImpl_SetVertexShaderConstant(INT Register, PVOID pConstantData, DWORD C
 		hRet = D3D_OK;
 	}
 }
+
 // parse xbox vertex shader function into an intermediate format
 extern void EmuParseVshFunction
 (
