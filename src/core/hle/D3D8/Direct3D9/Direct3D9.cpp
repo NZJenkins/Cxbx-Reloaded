@@ -191,8 +191,6 @@ static XTL::DWORD                  *g_Xbox_D3DDevice; // TODO: This should be a 
 static	DWORD						g_dwVertexShaderUsage = 0; // Unused. If needed, move to XbVertexShader.cpp
 */
 
-       XTL::DWORD                   g_Xbox_VertexShader_Handle = 0;
-
 // Static Function(s)
 static BOOL WINAPI                  EmuEnumDisplayDevices(GUID FAR *lpGUID, LPSTR lpDriverDescription, LPSTR lpDriverName, LPVOID lpContext, HMONITOR hm);
 static DWORD WINAPI                 EmuRenderWindow(LPVOID);
