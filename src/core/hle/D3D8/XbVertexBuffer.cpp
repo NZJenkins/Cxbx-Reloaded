@@ -123,7 +123,7 @@ int CountActiveD3DStreams()
 {
 	int lastStreamIndex = 0;
 	for (int i = 0; i < X_VSH_MAX_STREAMS; i++) {
-		if (g_Xbox_SetStreamSource[i].VertexBuffer != xbnullptr) {
+		if (GetXboxVertexStreamInput(i).VertexBuffer != xbnullptr) {
 			lastStreamIndex = i + 1;
 		}
 	}
@@ -292,7 +292,8 @@ void CxbxVertexBufferConverter::ConvertStream
 		uiHostVertexStride = (bNeedVertexPatching) ? pVertexShaderStreamInfo->HostVertexStride : uiXboxVertexStride;
 		dwHostVertexDataSize = uiVertexCount * uiHostVertexStride;
 	} else {
-		XTL::X_D3DVertexBuffer *pXboxVertexBuffer = g_Xbox_SetStreamSource[uiStream].VertexBuffer;
+		XTL::X_STREAMINPUT& XboxStreamInput = GetXboxVertexStreamInput(uiStream);
+		XTL::X_D3DVertexBuffer *pXboxVertexBuffer = XboxStreamInput.VertexBuffer;
         pXboxVertexData = (uint8_t*)GetDataFromXboxResource(pXboxVertexBuffer);
 		if (pXboxVertexData == xbnullptr) {
 			HRESULT hRet = g_pD3DDevice->SetStreamSource(
@@ -308,7 +309,7 @@ void CxbxVertexBufferConverter::ConvertStream
 			return;
 		}
 
-		uiXboxVertexStride = g_Xbox_SetStreamSource[uiStream].Stride;
+		uiXboxVertexStride = XboxStreamInput.Stride;
         // Set a new (exact) vertex count
 		uiVertexCount = pDrawContext->VerticesInBuffer;
 		// Dxbx note : Don't overwrite pDrawContext.dwVertexCount with uiVertexCount, because an indexed draw
