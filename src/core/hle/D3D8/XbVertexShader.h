@@ -29,6 +29,7 @@
 #include <vector>
 #include <future>
 
+#include "common\Settings.hpp"
 #include "core\hle\D3D8\XbD3D8Types.h" // for X_VSH_MAX_ATTRIBUTES
 
 // Host vertex shader counts
@@ -197,9 +198,19 @@ extern void EmuParseVshFunction
 	IntermediateVertexShader* pShader
 );
 
+struct MappedVertexShaderHandle {
+	bool isNotNullPtr;
+	DWORD RefCount;
+	DWORD Flags;
+	DWORD TotalSize;
+	XTL::X_VERTEXATTRIBUTEFORMAT* pVertexAttribute;
+	DWORD* pFunctionData;
+};
+
+MappedVertexShaderHandle VshHandleToXboxVertexShader(DWORD Handle);
+
 inline boolean VshHandleIsVertexShader(DWORD Handle) { return (Handle & X_D3DFVF_RESERVED0) ? TRUE : FALSE; }
 inline boolean VshHandleIsFVF(DWORD Handle) { return !VshHandleIsVertexShader(Handle); }
-inline XTL::X_D3DVertexShader *VshHandleToXboxVertexShader(DWORD Handle) { return (XTL::X_D3DVertexShader *)(Handle & ~X_D3DFVF_RESERVED0);}
 
 extern bool CxbxVertexDeclarationNeedsPatching(CxbxVertexDeclaration* pCxbxVertexDeclaration);
 extern CxbxVertexDeclaration* CxbxGetVertexDeclaration();

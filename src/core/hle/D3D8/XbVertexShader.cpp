@@ -186,14 +186,15 @@ static inline bool XboxVertexAttributeFormatIsFixedFunction(XTL::X_VERTEXATTRIBU
 }
 
 // TODO : Start using this function everywhere g_Xbox_VertexShader_Handle is accessed currently!
-XTL::X_D3DVertexShader* GetXboxVertexShader()
+MappedVertexShaderHandle GetXboxVertexShader()
 {
 	// LOG_INIT; // Allows use of DEBUG_D3DRESULT
 
 	using namespace XTL;
 
-	X_D3DVertexShader* pXboxVertexShader = xbnullptr;
 #if 0 // TODO : Retrieve vertex shader from actual Xbox D3D state
+	X_D3DVertexShader* pXboxVertexShader = xbnullptr;
+
 	// Only when we're sure of the location of the Xbox Device.m_pVertexShader variable
 	if (XboxVertexShaders.g_XboxAddr_pVertexShader) {
 		// read that (so that we get access to internal vertex shaders, like those generated
@@ -216,30 +217,30 @@ XTL::X_D3DVertexShader* GetXboxVertexShader()
 		// Now, to convert, we do need to have a valid vertex shader :
 		if (g_Xbox_VertexShader_Handle == 0) {
 			LOG_TEST_CASE("Unassigned Xbox vertex shader!");
-			return nullptr;
+			return MappedVertexShaderHandle{ 0 };
 		}
 
 		if (!VshHandleIsVertexShader(g_Xbox_VertexShader_Handle)) {
 #if 0 // TODO : Retrieve vertex shader from actual Xbox D3D state
 			LOG_TEST_CASE("Xbox vertex shader lacks X_D3DFVF_RESERVED0 bit!");
 #endif
-			return nullptr;
+			return  MappedVertexShaderHandle{ 0 };
 		}
 
-		pXboxVertexShader = VshHandleToXboxVertexShader(g_Xbox_VertexShader_Handle);
+		auto shader = VshHandleToXboxVertexShader(g_Xbox_VertexShader_Handle);
 #if 0 // TODO : Retrieve vertex shader from actual Xbox D3D state
 	}
 #endif
 
-	return pXboxVertexShader;
+	return shader;
 }
 
 static XTL::X_VERTEXATTRIBUTEFORMAT g_Xbox_FVF_VertexAttributeFormat = { 0 };
 
 XTL::X_VERTEXATTRIBUTEFORMAT *GetXboxVertexAttributeFormat()
 {
-	XTL::X_D3DVertexShader* pXboxVertexShader = GetXboxVertexShader();
-	if (pXboxVertexShader == xbnullptr)
+	auto shader = GetXboxVertexShader();
+	if (!shader.isNotNullPtr)
 	{
 		bool bIsFixedFunction = VshHandleIsFVF(g_Xbox_VertexShader_Handle);
 		if (bIsFixedFunction) {
@@ -261,7 +262,7 @@ XTL::X_VERTEXATTRIBUTEFORMAT *GetXboxVertexAttributeFormat()
 		return &g_Xbox_SetVertexShaderInput_Attributes;
 	}
 
-	return &(pXboxVertexShader->VertexAttribute);
+	return shader.pVertexAttribute;
 }
 
 // Reads the active Xbox stream input values (containing VertexBuffer, Offset and Stride) for the given stream number.
@@ -1014,6 +1015,37 @@ CxbxVertexDeclaration* FetchCachedCxbxVertexDeclaration(VertexDeclarationKey Cac
 	return nullptr;
 }
 
+MappedVertexShaderHandle VshHandleToXboxVertexShader(DWORD Handle) {
+	auto pXboxShader = Handle & ~X_D3DFVF_RESERVED0;
+
+	MappedVertexShaderHandle mapped = { 0 };
+
+	if (Handle == xbnull) {
+		return mapped;
+	}
+
+	// Repetitive mapping code
+	#define VERTEX_SHADER_MAP(type)\
+	{\
+		auto xboxShader = *(type*)pXboxShader;\
+		mapped.isNotNullPtr = true;\
+		mapped.RefCount = xboxShader.RefCount;\
+		mapped.Flags = xboxShader.Flags;\
+		mapped.TotalSize = xboxShader.TotalSize;\
+		mapped.pFunctionData = &xboxShader.FunctionData[0];\
+		mapped.pVertexAttribute = &xboxShader.VertexAttribute;\
+		return mapped;\
+	}
+
+	// Map struct based on XDK D3D8 version
+	switch (g_LibVersion_D3D8) {
+	case 3948: VERTEX_SHADER_MAP(XTL::X_D3DVertexShader3948);
+	case 5849: VERTEX_SHADER_MAP(XTL::X_D3DVertexShader5849);
+	default:   VERTEX_SHADER_MAP(XTL::X_D3DVertexShader5849);
+	}
+	#undef VERTEX_SHADER_MAP
+}
+
 bool CxbxVertexDeclarationNeedsPatching(CxbxVertexDeclaration* pCxbxVertexDeclaration)
 {
 	if (pCxbxVertexDeclaration == nullptr) {
@@ -1125,8 +1157,8 @@ void CxbxImpl_SetVertexShaderInput(DWORD Handle, UINT StreamCount, XTL::X_STREAM
 	{
 		assert(VshHandleIsVertexShader(Handle));
 
-		X_D3DVertexShader* pXboxVertexShader = VshHandleToXboxVertexShader(Handle);
-		assert(pXboxVertexShader);
+		auto shader = VshHandleToXboxVertexShader(Handle);
+		assert(!shader.isNotNullPtr);
 
 		// Xbox DOES store the Handle, but since it merely returns this through (unpatched) D3DDevice_GetVertexShaderInput, we don't have to.
 
@@ -1137,7 +1169,7 @@ void CxbxImpl_SetVertexShaderInput(DWORD Handle, UINT StreamCount, XTL::X_STREAM
 			memcpy(g_Xbox_SetVertexShaderInput_Data, pStreamInputs, StreamCount * sizeof(XTL::X_STREAMINPUT)); // Make a copy of the supplied StreamInputs array
 		}
 
-		g_Xbox_SetVertexShaderInput_Attributes = pXboxVertexShader->VertexAttribute; // Copy this vertex shaders's attribute slots
+		g_Xbox_SetVertexShaderInput_Attributes = *shader.pVertexAttribute; // Copy this vertex shaders's attribute slots
 	}
 }
 
@@ -1200,10 +1232,10 @@ void CxbxImpl_LoadVertexShader(DWORD Handle, DWORD Address)
 	// Address is the slot (offset) from which the program must be written onwards (as whole DWORDS)
 	// D3DDevice_LoadVertexShader pushes the program contained in the Xbox VertexShader struct to the NV2A
 
-	XTL::X_D3DVertexShader* pXboxVertexShader = VshHandleToXboxVertexShader(Handle);
+	auto shader = VshHandleToXboxVertexShader(Handle);
 
-	auto pNV2ATokens = &pXboxVertexShader->FunctionData[0];
-	DWORD NrTokens = pXboxVertexShader->TotalSize;
+	auto pNV2ATokens = shader.pFunctionData;
+	DWORD NrTokens = shader.TotalSize;
 
 #if 1 // TODO : Remove dirty hack (?once CreateVertexShader trampolines to Xbox code that sets TotalSize correctly?) :
 	if (NrTokens == 0)
@@ -1264,17 +1296,16 @@ void CxbxImpl_SetVertexShader(DWORD Handle)
 
 	g_Xbox_VertexShader_Handle = Handle;
 
-	XTL::X_D3DVertexShader* pXboxVertexShader;
 	if (VshHandleIsVertexShader(Handle)) {
-		pXboxVertexShader = VshHandleToXboxVertexShader(Handle);
-		if (pXboxVertexShader->Flags & X_VERTEXSHADER_FLAG_PROGRAM) {
+		auto shader = VshHandleToXboxVertexShader(Handle);
+		if (shader.Flags & X_VERTEXSHADER_FLAG_PROGRAM) {
 #if 0 // Since the D3DDevice_SetVertexShader patch already called it's trampoline, these calls have already been executed :
 			CxbxImpl_LoadVertexShader(Handle, 0);
 			CxbxImpl_SelectVertexShader(Handle, 0);
 #endif
 		}
 		else {
-			if (pXboxVertexShader->Flags & X_VERTEXSHADER_FLAG_PASSTHROUGH) {
+			if (shader.Flags & X_VERTEXSHADER_FLAG_PASSTHROUGH) {
 				LOG_TEST_CASE("TODO : Select Pass-through program HLSL Shader");
 			}
 			else {
@@ -1299,12 +1330,12 @@ void CxbxImpl_DeleteVertexShader(DWORD Handle)
 	// Handle is always address of an Xbox VertexShader struct, or-ed with 1 (X_D3DFVF_RESERVED0)
 	// It's reference count is lowered. If it reaches zero (0), the struct is freed.
 
-	XTL::X_D3DVertexShader* pXboxVertexShader = VshHandleToXboxVertexShader(Handle);
-	if (pXboxVertexShader == nullptr) {
+	auto shader = VshHandleToXboxVertexShader(Handle);
+	if (!shader.isNotNullPtr) {
 		return;
 	}
 
-	if (pXboxVertexShader->RefCount > 1) {
+	if (shader.RefCount > 1) {
 		return;
 	}
 

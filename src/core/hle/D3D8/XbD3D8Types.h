@@ -1090,7 +1090,27 @@ typedef struct _X_STREAMINPUT
     UINT                Offset;
 } X_STREAMINPUT;
 
-struct X_D3DVertexShader
+struct X_D3DVertexShader3948 {
+	DWORD RefCount;
+	DWORD Flags;
+	DWORD FunctionSize;
+	DWORD TotalSize;
+	DWORD Unknown1;
+	DWORD Unknown2;
+	DWORD Unknown3;
+	DWORD Unknown4;
+	DWORD Unknown5;
+	DWORD Unknown6;
+	// 20 Vertex attributes?
+	X_VERTEXATTRIBUTEFORMAT VertexAttribute;
+	X_VERTEXSHADERINPUT UnknownSlot0;
+	X_VERTEXSHADERINPUT UnknownSlot1;
+	X_VERTEXSHADERINPUT UnknownSlot2;
+	X_VERTEXSHADERINPUT UnknownSlot3;
+	DWORD FunctionData[X_VSH_MAX_INSTRUCTION_COUNT];
+};
+
+struct X_D3DVertexShader5849
 {
 	// Note : Debug XBE's have a 'Vshd' DWORD signature prefixing this!
 	DWORD RefCount; // Based on the observation this member is set to 1 in D3DDevice_CreateVertexShader and decreased in D3DDevice_DeleteVertexShader
