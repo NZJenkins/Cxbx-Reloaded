@@ -1038,10 +1038,12 @@ MappedVertexShaderHandle VshHandleToXboxVertexShader(DWORD Handle) {
 	}
 
 	// Map struct based on XDK D3D8 version
-	switch (g_LibVersion_D3D8) {
-	case 3948: VERTEX_SHADER_MAP(XTL::X_D3DVertexShader3948);
-	case 5849: VERTEX_SHADER_MAP(XTL::X_D3DVertexShader5849);
-	default:   VERTEX_SHADER_MAP(XTL::X_D3DVertexShader5849);
+	auto version = g_LibVersion_D3D8;
+	if (version <= 3948) {
+		VERTEX_SHADER_MAP(XTL::X_D3DVertexShader3948);
+	}
+	else {
+		VERTEX_SHADER_MAP(XTL::X_D3DVertexShader5849);
 	}
 	#undef VERTEX_SHADER_MAP
 }
