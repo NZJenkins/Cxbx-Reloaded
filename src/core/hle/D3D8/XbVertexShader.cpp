@@ -1027,13 +1027,13 @@ MappedVertexShaderHandle VshHandleToXboxVertexShader(DWORD Handle) {
 	// Repetitive mapping code
 	#define VERTEX_SHADER_MAP(type)\
 	{\
-		auto xboxShader = *(type*)pXboxShader;\
+		auto xboxShader = (type*)pXboxShader;\
 		mapped.isNotNullPtr = true;\
-		mapped.RefCount = xboxShader.RefCount;\
-		mapped.Flags = xboxShader.Flags;\
-		mapped.TotalSize = xboxShader.TotalSize;\
-		mapped.pFunctionData = &xboxShader.FunctionData[0];\
-		mapped.pVertexAttribute = &xboxShader.VertexAttribute;\
+		mapped.RefCount = xboxShader->RefCount;\
+		mapped.Flags = xboxShader->Flags;\
+		mapped.TotalSize = xboxShader->TotalSize;\
+		mapped.pFunctionData = &xboxShader->FunctionData[0];\
+		mapped.pVertexAttribute = &xboxShader->VertexAttribute;\
 		return mapped;\
 	}
 
@@ -1160,7 +1160,7 @@ void CxbxImpl_SetVertexShaderInput(DWORD Handle, UINT StreamCount, XTL::X_STREAM
 		assert(VshHandleIsVertexShader(Handle));
 
 		auto shader = VshHandleToXboxVertexShader(Handle);
-		assert(!shader.isNotNullPtr);
+		assert(shader.isNotNullPtr);
 
 		// Xbox DOES store the Handle, but since it merely returns this through (unpatched) D3DDevice_GetVertexShaderInput, we don't have to.
 
