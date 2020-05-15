@@ -385,40 +385,11 @@ Material DoMaterial(const uint index, const float4 color0, const float4 color1)
 
 float DoFog()
 {
-    const int D3DFOG_NONE = 0;
-    const int D3DFOG_EXP = 1;
-    const int D3DFOG_EXP2 = 2;
-    const int D3DFOG_LINEAR = 3;
-
-    // Early exit if fog is disabled
-    //if (!state.Fog.Enable || state.Fog.TableMode == D3DFOG_NONE)
-    //    return 0.f;
-
-    // We just need to output the depth in oFog (?)
-    // Is vertex fog activated by RangeFogEnable?
+	// TODO implement properly
+	// If the projection matrix matches certain conditions
+	// We can use 1/pos.w, or else z
     float depth = state.Fog.RangeFogEnable ? length(View.Position.xyz) : abs(View.Position.z);
     return depth;
-
-    /*
-    float density = state.Fog.Density;
-    float fogStart = state.Fog.Start;
-    float fogEnd = state.Fog.End;
-
-    if (state.Fog.TableMode == D3DFOG_EXP)
-    {
-        return 1.f / exp(density * depth);
-    }
-    else if (state.Fog.TableMode == D3DFOG_EXP2)
-    {
-        return 1.f / exp(pow(density * depth, 2.f));
-    }
-    else if (state.Fog.TableMode == D3DFOG_LINEAR)
-    {
-        return saturate((fogEnd - depth) / (fogEnd - fogStart));
-    }
-
-    return 0.f;
-*/
 }
 
 float4 DoTexCoord(const uint stage, const VS_INPUT xIn)

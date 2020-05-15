@@ -94,12 +94,7 @@ struct TextureState {
 };
 
 struct Fog {
-    //alignas(16) float Enable;
     alignas(16) float RangeFogEnable;
-    //alignas(16) float TableMode;
-    //alignas(16) float Start;
-    //alignas(16) float End;
-    //alignas(16) float Density;
 };
 
 struct RenderStateBlock {
