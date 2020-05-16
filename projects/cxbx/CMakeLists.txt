@@ -201,12 +201,26 @@ add_custom_command(TARGET cxbx POST_BUILD
  COMMAND ${CMAKE_COMMAND} -E copy ${CXBXR_GLEW_DLL} $<TARGET_FILE_DIR:cxbx>
 )
 
-# TMP vertex shader compilation
+# TODO remove repetition
+# HLSL compilation
+# Don't build HLSL files, though include them in Visual Studio
 set_source_files_properties(
-  "${CXBXR_ROOT_DIR}/src/core/hle/D3D8/Direct3D9/CxbxVertexShaderFvf.hlsl" PROPERTIES 
-  VS_SHADER_MODEL "3.0"
-  VS_SHADER_TYPE "Vertex"
-  VS_SHADER_OUTPUT_HEADER_FILE "${CXBXR_ROOT_DIR}/src/core/hle/D3D8/Direct3D9/CxbxVertexShaderFvf.h"
-  VS_SHADER_FLAGS /O3
-  VS_SHADER_ENABLE_DEBUG true
+  "${CXBXR_ROOT_DIR}/src/core/hle/D3D8/Direct3D9/CxbxVertexShaderTemplate.hlsl"
+  "${CXBXR_ROOT_DIR}/src/core/hle/D3D8/Direct3D9/FixedFunctionVertexShader.hlsl" 
+  PROPERTIES HEADER_FILE_ONLY TRUE
+)
+
+# Copy the fixed function shader files to a directory
+# As it's too large to #include as a string
+add_custom_command(TARGET cxbx POST_BUILD 
+ COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:cxbx>/hlsl)
+add_custom_command(TARGET cxbx POST_BUILD
+ COMMAND ${CMAKE_COMMAND} -E copy 
+ "${CXBXR_ROOT_DIR}/src/core/hle/D3D8/Direct3D9/FixedFunctionVertexShader.hlsl"
+ $<TARGET_FILE_DIR:cxbx>/hlsl
+)
+add_custom_command(TARGET cxbx POST_BUILD
+ COMMAND ${CMAKE_COMMAND} -E copy
+ "${CXBXR_ROOT_DIR}/src/core/hle/D3D8/Direct3D9/RenderStateBlock.cpp"
+ $<TARGET_FILE_DIR:cxbx>/hlsl
 )

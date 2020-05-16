@@ -222,18 +222,19 @@ extern ShaderType EmuGetShaderInfo(IntermediateVertexShader* pIntermediateShader
 	return ShaderType::Compilable;
 }
 
-HRESULT CompileHlsl(const std::string& hlsl, ID3DBlob** ppHostShader)
+HRESULT CompileHlsl(const std::string& hlsl, ID3DBlob** ppHostShader, const char* pSourceName)
 {
 	// TODO include header in vertex shader
 	//XTL::X_VSH_SHADER_HEADER* pXboxVertexShaderHeader = (XTL::X_VSH_SHADER_HEADER*)pXboxFunction;
 	ID3DBlob* pErrors = nullptr;
+	ID3DBlob* pErrorsCompatibility = nullptr;
 	HRESULT             hRet = 0;
 
-	UINT flags1 = D3DCOMPILE_OPTIMIZATION_LEVEL3 | D3DCOMPILE_AVOID_FLOW_CONTROL;
+	UINT flags1 = D3DCOMPILE_OPTIMIZATION_LEVEL3;
 	hRet = D3DCompile(
 		hlsl.c_str(),
 		hlsl.length(),
-		nullptr, // pSourceName
+		pSourceName, // pSourceName
 		nullptr, // pDefines
 		D3D_COMPILE_STANDARD_FILE_INCLUDE, // pInclude // TODO precompile x_* HLSL functions?
 		"main", // shader entry poiint
@@ -244,13 +245,14 @@ HRESULT CompileHlsl(const std::string& hlsl, ID3DBlob** ppHostShader)
 		&pErrors // ppErrorMsgs out
 	);
 	if (FAILED(hRet)) {
+		EmuLog(LOG_LEVEL::WARNING, "Shader compile failed. Recompiling in compatibility mode");
 		// Attempt to retry in compatibility mode, this allows some vertex-state shaders to compile
 		// Test Case: Spy vs Spy
-		flags1 |= D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY;
+		flags1 |= D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY | D3DCOMPILE_AVOID_FLOW_CONTROL;
 		hRet = D3DCompile(
 			hlsl.c_str(),
 			hlsl.length(),
-			nullptr, // pSourceName
+			pSourceName, // pSourceName
 			nullptr, // pDefines
 			D3D_COMPILE_STANDARD_FILE_INCLUDE, // pInclude // TODO precompile x_* HLSL functions?
 			"main", // shader entry poiint
@@ -258,11 +260,11 @@ HRESULT CompileHlsl(const std::string& hlsl, ID3DBlob** ppHostShader)
 			flags1, // flags1
 			0, // flags2
 			ppHostShader, // out
-			&pErrors // ppErrorMsgs out
+			&pErrorsCompatibility // ppErrorMsgs out
 		);
 
 		if (FAILED(hRet)) {
-			LOG_TEST_CASE("Couldn't assemble recompiled vertex shader");
+			LOG_TEST_CASE("Couldn't assemble vertex shader");
 			//EmuLog(LOG_LEVEL::WARNING, "Couldn't assemble recompiled vertex shader");
 		}
 	}
@@ -274,6 +276,8 @@ HRESULT CompileHlsl(const std::string& hlsl, ID3DBlob** ppHostShader)
 		EmuLog(hlslErrorLogLevel, "%s", (char*)(pErrors->GetBufferPointer()));
 		pErrors->Release();
 		pErrors = nullptr;
+		pErrorsCompatibility->Release();
+		pErrorsCompatibility = nullptr;
 	}
 
 	LOG_CHECK_ENABLED(LOG_LEVEL::DEBUG)
@@ -320,24 +324,29 @@ extern HRESULT EmuCompileShader
 	EmuLog(LOG_LEVEL::DEBUG, DebugPrependLineNumbers(hlsl_str).c_str());
 	EmuLog(LOG_LEVEL::DEBUG, "-----------------------");
 
-	return CompileHlsl(hlsl_str, ppHostShader);
+	return CompileHlsl(hlsl_str, ppHostShader, "CxbxVertexShaderTemplate.hlsl");
 }
 
-static std::vector<char> fvfShaderBuffer;
 static ID3DBlob* pFvfHostShader = nullptr;
 
-extern HRESULT EmuCompileXboxFvf(char** shaderData)
+extern HRESULT EmuCompileXboxFvf(ID3DBlob** ppHostShader)
 {
-	if (fvfShaderBuffer.size() == 0) {
-		// std::ifstream shaderStream(R"(C:\Users\Anthony\Desktop\_\dev\Cxbx-Reloaded\build\x86-Release\bin\Release\CxbxVertexShaderFvf.cso)", std::ios::in | std::ios::binary);
-		auto outputDir = std::filesystem::path(szFilePath_CxbxReloaded_Exe).parent_path();
-		std::ifstream shaderStream(outputDir.append("CxbxVertexShaderFvf.cso").string(), std::ios::in | std::ios::binary);
-		fvfShaderBuffer = std::vector<char>(std::istreambuf_iterator<char>(shaderStream), std::istreambuf_iterator<char>());
-		// CompileHlsl(buffer.str(), &pFvfHostShader);
+	// TODO does this need to be thread safe?
+	if (pFvfHostShader == nullptr) {
+		auto hlslDir = std::filesystem::path(szFilePath_CxbxReloaded_Exe)
+			.parent_path()
+			.append("hlsl");
+
+		auto sourceFile = hlslDir.append("FixedFunctionVertexShader.hlsl").string();
+
+		std::ifstream fixedFunctionHlslStream(sourceFile);
+		std::stringstream hlsl;
+		hlsl << fixedFunctionHlslStream.rdbuf();
+		CompileHlsl(hlsl.str(), &pFvfHostShader, sourceFile.c_str());
 	}
 
-	*shaderData = fvfShaderBuffer.data();
-	//*ppHostShader = pFvfHostShader;
+	*ppHostShader = pFvfHostShader;
+
 	return 0;
 }
 

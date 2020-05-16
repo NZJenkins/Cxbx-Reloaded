@@ -1010,9 +1010,9 @@ void SetFixedFunctionShader() {
 	}
 
 	if (!fvfShader) {
-		DWORD* blobby = nullptr;
-		EmuCompileXboxFvf((char**)&blobby);
-		auto hRet = g_pD3DDevice->CreateVertexShader(blobby, &fvfShader);
+		ID3DBlob* pCompiledShader;
+		EmuCompileXboxFvf(&pCompiledShader);
+		auto hRet = g_pD3DDevice->CreateVertexShader((DWORD*)pCompiledShader->GetBufferPointer(), &fvfShader);
 		if (hRet != D3D_OK) CxbxKrnlCleanup("creating FF shader failed");
 	}
 
