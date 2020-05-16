@@ -7291,7 +7291,7 @@ D3DXVECTOR4 toVector(D3DCOLORVALUE val) {
 	return D3DXVECTOR4(val.r, val.g, val.b, val.a);
 }
 
-void UpdateLightState(int enabledLightsIndex, D3DXVECTOR4* pLightAmbient) {
+void UpdateLightState(int enabledLightsIndex, D3DXVECTOR4* pLightAmbient, D3DMATRIX viewTransform) {
 	auto d3dLightIndex = fakeD3DState.EnabledLights[enabledLightsIndex];
 	auto light = &g_renderStateBlock.Lights[enabledLightsIndex];
 
@@ -7302,12 +7302,21 @@ void UpdateLightState(int enabledLightsIndex, D3DXVECTOR4* pLightAmbient) {
 
 	auto d3dLight = &fakeD3DState.Lights[d3dLightIndex];
 
+	// TODO replace D3DX
+	// Pre-transform light position to viewspace
+	D3DXVECTOR4 positionV;
+	D3DXVec3Transform(&positionV, (D3DXVECTOR3*)&d3dLight->Position, (D3DXMATRIX*)&viewTransform);
+	light->PositionV = (D3DXVECTOR3)positionV;
+
+	// Pre-transform light direction to viewspace and normalize
+	D3DXVECTOR4 directionV;
+	D3DXVec3Transform(&directionV, (D3DXVECTOR3*)&d3dLight->Direction, (D3DXMATRIX*)&viewTransform);
+	D3DXVec3Normalize((D3DXVECTOR3*)&light->DirectionVN, (D3DXVECTOR3*)&directionV);
+
 	// Map D3D light to state struct
 	light->Type = (float)((int)d3dLight->Type);
 	light->Diffuse = toVector(d3dLight->Diffuse);
 	light->Specular = toVector(d3dLight->Specular);
-	light->Position = d3dLight->Position;
-	D3DXVec3Normalize((D3DXVECTOR3*)&d3dLight->Direction, (D3DXVECTOR3*)&light->NormalizedDirection); // Pre-normalize light direction
 	light->Range = d3dLight->Range;
 	light->Falloff = d3dLight->Falloff;
 	light->Attenuation.x = d3dLight->Attenuation0;
@@ -7371,7 +7380,7 @@ void CxbxUpdateFixedFunctionStateBlock()
 
 	auto LightAmbient = D3DXVECTOR4(0.f, 0.f, 0.f, 0.f);
 	for (size_t i = 0; i < g_renderStateBlock.Lights.size(); i++) {
-		UpdateLightState(i, &LightAmbient);
+		UpdateLightState(i, &LightAmbient, g_renderStateBlock.Transforms.View);
 	}
 
 	g_renderStateBlock.AmbientPlusLightAmbient = Ambient + LightAmbient;

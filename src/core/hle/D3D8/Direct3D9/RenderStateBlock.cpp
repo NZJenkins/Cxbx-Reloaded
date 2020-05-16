@@ -43,10 +43,10 @@ struct Light {
     float4 Diffuse;
     float4 Specular;
     // 16 bytes
-    alignas(16) float3 Position;
+    alignas(16) float3 PositionV;
     alignas(16) float Range;
     // 16 bytes
-    alignas(16) float3 NormalizedDirection;
+    alignas(16) float3 DirectionVN;
     alignas(16) float Type; // 1=Point, 2=Spot, 3=Directional
     //
     alignas(16) float3 Attenuation;
