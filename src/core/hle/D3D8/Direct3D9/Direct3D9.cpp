@@ -6808,10 +6808,17 @@ void CxbxTransferVertexShaderConstants()
 	}
 }
 
+extern void CxbxUpdateHostVertexDeclaration(); // TMP glue
+extern void CxbxUpdateHostVertexShader(); // TMP glue
+
 void CxbxUpdateNativeD3DResources()
 {
 	// Before we start, make sure our resource cache stays limited in size
 	PrunePaletizedTexturesCache(); // TODO : Could we move this to Swap instead?
+
+	CxbxUpdateHostVertexDeclaration();
+
+	CxbxUpdateHostVertexShader();
 
     EmuUpdateActiveTextureStages();
 
@@ -6829,6 +6836,7 @@ void CxbxUpdateNativeD3DResources()
     if (!g_DisablePixelShaders) {
         DxbxUpdateActivePixelShader();
     }
+
 
 /* TODO : Port these :
 	DxbxUpdateActiveVertexShader();
