@@ -7731,7 +7731,8 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_SetVertexShaderInput)
 	CxbxImpl_SetVertexShaderInput(Handle, StreamCount, pStreamInputs);
 
 	// Call trampoline
-	XB_TRMP(D3DDevice_SetVertexShaderInput)(Handle, StreamCount, pStreamInputs);
+	if (XB_TRMP(D3DDevice_SetVertexShaderInput))
+		XB_TRMP(D3DDevice_SetVertexShaderInput)(Handle, StreamCount, pStreamInputs);
 }
 
 // ******************************************************************
