@@ -299,8 +299,16 @@ static DWORD* CxbxGetVertexShaderTokens(XTL::X_D3DVertexShader* pXboxVertexShade
 	return &pXboxVertexShader->ProgramAndConstants[0];
 }
 
-static XTL::X_VERTEXATTRIBUTEFORMAT *GetXboxVertexAttributeFormat()
+extern bool g_InlineVertexBuffer_DeclarationOverride; // TMP glue
+extern XTL::X_VERTEXATTRIBUTEFORMAT g_InlineVertexBuffer_AttributeFormat; // TMP glue
+
+static XTL::X_VERTEXATTRIBUTEFORMAT* GetXboxVertexAttributeFormat()
 {
+	// Special case for CxbxImpl_End() based drawing
+	if (g_InlineVertexBuffer_DeclarationOverride) {
+		return &g_InlineVertexBuffer_AttributeFormat;
+	}
+
 	XTL::X_D3DVertexShader* pXboxVertexShader = GetXboxVertexShader();
 	if (pXboxVertexShader == xbnullptr) {
 		// Despite possibly not being used, the pXboxVertexShader argument must always be assigned
