@@ -34,7 +34,7 @@
 #include "core\hle\D3D8\Direct3D9\Direct3D9.h" // For g_pD3DDevice
 #include "core\hle\D3D8\Direct3D9\WalkIndexBuffer.h" // for WalkIndexBuffer
 #include "core\hle\D3D8\ResourceTracker.h"
-#include "core\hle\D3D8\XbPushBuffer.h" // for DxbxFVF_GetNumberOfTextureCoordinates
+#include "core\hle\D3D8\XbPushBuffer.h" // For CxbxDrawPrimitiveUP
 #include "core\hle\D3D8\XbVertexBuffer.h"
 #include "core\hle\D3D8\XbConvert.h"
 
@@ -236,25 +236,21 @@ void CxbxVertexBufferConverter::ConvertStream
 )
 {
 	extern D3DCAPS g_D3DCaps;
+	extern XTL::X_VERTEXATTRIBUTEFORMAT* GetXboxVertexAttributeFormat(); // TMP glue
 
-	bool bVshHandleIsFVF = VshHandleIsFVF(g_Xbox_VertexShader_Handle);
-	DWORD XboxFVF = bVshHandleIsFVF ? g_Xbox_VertexShader_Handle : 0;
-	// Texture normalization can only be set for FVF shaders
+	// Texture normalization only applies to pre-transformed (X_D3DFVF_XYZRHW) vertex declarations
 	bool bNeedTextureNormalization = false;
 	struct { int NrTexCoords; bool bTexIsLinear; int Width; int Height; int Depth; } pActivePixelContainer[XTL::X_D3DTS_STAGECOUNT] = { 0 };
 
-	if (bVshHandleIsFVF) {
-		DWORD dwTexN = (XboxFVF & D3DFVF_TEXCOUNT_MASK) >> D3DFVF_TEXCOUNT_SHIFT;
-		if (dwTexN > XTL::X_D3DTS_STAGECOUNT) {
-			LOG_TEST_CASE("FVF,dwTexN > X_D3DTS_STAGECOUNT");
-		}
-
+	XTL::X_VERTEXATTRIBUTEFORMAT* pXboxVertexAttributeFormat = GetXboxVertexAttributeFormat();
+	if (pXboxVertexAttributeFormat->Slots[XTL::X_D3DVSDE_POSITION].Format == XTL::X_D3DVSDT_FLOAT4) {
 		// Check for active linear textures.
 		//X_D3DBaseTexture *pLinearBaseTexture[XTL::X_D3DTS_STAGECOUNT];
 		for (unsigned int i = 0; i < XTL::X_D3DTS_STAGECOUNT; i++) {
-			// Only normalize coordinates used by the FVF shader :
-			if (i + 1 <= dwTexN) {
-				pActivePixelContainer[i].NrTexCoords = DxbxFVF_GetNumberOfTextureCoordinates(XboxFVF, i);
+			auto pTextureSlot = &(pXboxVertexAttributeFormat->Slots[XTL::X_D3DVSDE_TEXCOORD0 + i]);
+			// Only normalize texture coordinates present in the vertex declaration :
+			if (pTextureSlot->Format > XTL::X_D3DVSDT_NONE) {
+				pActivePixelContainer[i].NrTexCoords = (pTextureSlot->Format >> 4) & 0x7;
 				// TODO : Use GetXboxBaseTexture()
 				XTL::X_D3DBaseTexture *pXboxBaseTexture = g_pXbox_SetTexture[i];
 				if (pXboxBaseTexture != xbnullptr) {
@@ -655,10 +651,6 @@ void CxbxVertexBufferConverter::ConvertStream
 	// Xbox FVF shaders are identical to host Direct3D 8.1, however
 	// texture coordinates may need normalization if used with linear textures.
 	if (bNeedTextureNormalization) {
-		// assert(bVshHandleIsFVF);
-
-		// Locate texture coordinate offset in vertex structure.
-		UINT uiTextureCoordinatesByteOffsetInVertex = DxbxFVFToVertexSizeInBytes(XboxFVF, /*bIncludeTextures=*/false);
 		if (bNeedVertexPatching) {
 			LOG_TEST_CASE("Potential xbox vs host texture-offset difference! (bNeedVertexPatching within bNeedTextureNormalization)");
 		}
@@ -683,9 +675,10 @@ void CxbxVertexBufferConverter::ConvertStream
 			FLOAT *pVertexDataAsFloat = (FLOAT*)(&pHostVertexData[uiVertex * uiHostVertexStride]);
 
 			// Normalize texture coordinates in FVF stream
-			FLOAT *pVertexUVData = (FLOAT*)((uintptr_t)pVertexDataAsFloat + uiTextureCoordinatesByteOffsetInVertex);
 			for (unsigned int i = 0; i < XTL::X_D3DTS_STAGECOUNT; i++) {
 				if (pActivePixelContainer[i].bTexIsLinear) {
+					auto pTextureSlot = &(pXboxVertexAttributeFormat->Slots[XTL::X_D3DVSDE_TEXCOORD0 + i]);
+					FLOAT *pVertexUVData = (FLOAT*)(((uintptr_t)pVertexDataAsFloat) + pTextureSlot->Offset);
 					switch (pActivePixelContainer[i].NrTexCoords) {
 					case 0:
 						LOG_TEST_CASE("Normalize 0D?");
@@ -710,8 +703,6 @@ void CxbxVertexBufferConverter::ConvertStream
 						break;
 					}
 				}
-
-				pVertexUVData += pActivePixelContainer[i].NrTexCoords;
 			}
 		}
 	}

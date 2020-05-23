@@ -198,7 +198,6 @@ extern void EmuParseVshFunction
 );
 
 inline boolean VshHandleIsVertexShader(DWORD Handle) { return (Handle & X_D3DFVF_RESERVED0) ? TRUE : FALSE; }
-inline boolean VshHandleIsFVF(DWORD Handle) { return !VshHandleIsVertexShader(Handle); }
 inline XTL::X_D3DVertexShader *VshHandleToXboxVertexShader(DWORD Handle) { return (XTL::X_D3DVertexShader *)(Handle & ~X_D3DFVF_RESERVED0);}
 
 extern bool CxbxVertexDeclarationNeedsPatching(CxbxVertexDeclaration* pCxbxVertexDeclaration);
