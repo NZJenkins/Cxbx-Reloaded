@@ -57,7 +57,7 @@ typedef struct _D3DIVB
 	FLOAT       PointSize;    // X_D3DVSDE_POINTSIZE    > D3DFVF_POINTSIZE unavailable; TODO : How to handle?
 	D3DCOLOR    BackDiffuse;  // X_D3DVSDE_BACKDIFFUSE  > D3DFVF_BACKDIFFUSE unavailable; TODO : How to handle?
 	D3DCOLOR    BackSpecular; // X_D3DVSDE_BACKSPECULAR > D3DFVF_BACKSPECULAR unavailable; TODO : How to handle?
-	D3DXVECTOR4 TexCoord[4];  // X_D3DVSDE_TEXCOORD0    > D3DFVF_TEX1 (and 4 more up to D3DFVF_TEX4)
+	D3DXVECTOR4 TexCoord[4];  // X_D3DVSDE_TEXCOORD0    > D3DFVF_TEX1, (and 3 more up to D3DFVF_TEX4)
 	D3DXVECTOR4 Reg13Up[3];
 	// (*) X_D3DVSDE_POSITION and X_D3DVSDE_VERTEX both set Position, but Rhw seems optional,
 	// hence, selection for D3DFVF_XYZ or D3DFVF_XYZRHW is rather fuzzy. We DO know that once
@@ -236,41 +236,6 @@ void CxbxVertexBufferConverter::ConvertStream
 )
 {
 	extern D3DCAPS g_D3DCaps;
-	extern XTL::X_VERTEXATTRIBUTEFORMAT* GetXboxVertexAttributeFormat(); // TMP glue
-
-	// Texture normalization only applies to pre-transformed (X_D3DFVF_XYZRHW) vertex declarations
-	bool bNeedTextureNormalization = false;
-	struct { int NrTexCoords; bool bTexIsLinear; int Width; int Height; int Depth; } pActivePixelContainer[XTL::X_D3DTS_STAGECOUNT] = { 0 };
-
-	XTL::X_VERTEXATTRIBUTEFORMAT* pXboxVertexAttributeFormat = GetXboxVertexAttributeFormat();
-	if (pXboxVertexAttributeFormat->Slots[XTL::X_D3DVSDE_POSITION].Format == XTL::X_D3DVSDT_FLOAT4) {
-		// Check for active linear textures.
-		//X_D3DBaseTexture *pLinearBaseTexture[XTL::X_D3DTS_STAGECOUNT];
-		for (unsigned int i = 0; i < XTL::X_D3DTS_STAGECOUNT; i++) {
-			auto pTextureSlot = &(pXboxVertexAttributeFormat->Slots[XTL::X_D3DVSDE_TEXCOORD0 + i]);
-			// Only normalize texture coordinates present in the vertex declaration :
-			if (pTextureSlot->Format > XTL::X_D3DVSDT_NONE) {
-				pActivePixelContainer[i].NrTexCoords = (pTextureSlot->Format >> 4) & 0x7;
-				// TODO : Use GetXboxBaseTexture()
-				XTL::X_D3DBaseTexture *pXboxBaseTexture = g_pXbox_SetTexture[i];
-				if (pXboxBaseTexture != xbnullptr) {
-					extern XTL::X_D3DFORMAT GetXboxPixelContainerFormat(const XTL::X_D3DPixelContainer *pXboxPixelContainer); // TODO : Move to XTL-independent header file
-
-					XTL::X_D3DFORMAT XboxFormat = GetXboxPixelContainerFormat(pXboxBaseTexture);
-					if (EmuXBFormatIsLinear(XboxFormat)) {
-						// This is often hit by the help screen in XDK samples.
-						bNeedTextureNormalization = true;
-						// Remember linearity, width and height :
-						pActivePixelContainer[i].bTexIsLinear = true;
-						// TODO : Use DecodeD3DSize or GetPixelContainerWidth + GetPixelContainerHeight
-						pActivePixelContainer[i].Width = (pXboxBaseTexture->Size & X_D3DSIZE_WIDTH_MASK) + 1;
-						pActivePixelContainer[i].Height = ((pXboxBaseTexture->Size & X_D3DSIZE_HEIGHT_MASK) >> X_D3DSIZE_HEIGHT_SHIFT) + 1;
-						// TODO : Support 3D textures
-					}
-				}
-			}
-		}
-	}
 
 	CxbxVertexShaderStreamInfo *pVertexShaderStreamInfo = nullptr;
 	if (m_pCxbxVertexDeclaration != nullptr) {
@@ -283,7 +248,7 @@ void CxbxVertexBufferConverter::ConvertStream
 	}
 
 	bool bNeedVertexPatching = (pVertexShaderStreamInfo != nullptr && pVertexShaderStreamInfo->NeedPatch);
-	bool bNeedStreamCopy = bNeedTextureNormalization || bNeedVertexPatching;
+	bool bNeedStreamCopy = bNeedVertexPatching;
 
 	uint8_t *pXboxVertexData = xbnullptr;
 	UINT uiXboxVertexStride = 0;
@@ -648,65 +613,6 @@ void CxbxVertexBufferConverter::ConvertStream
 		}
 	}
 
-	// Xbox FVF shaders are identical to host Direct3D 8.1, however
-	// texture coordinates may need normalization if used with linear textures.
-	if (bNeedTextureNormalization) {
-		if (bNeedVertexPatching) {
-			LOG_TEST_CASE("Potential xbox vs host texture-offset difference! (bNeedVertexPatching within bNeedTextureNormalization)");
-		}
-		// As long as vertices aren't resized / patched up until the texture coordinates,
-		// the uiTextureCoordinatesByteOffsetInVertex on host will match Xbox 
-
-        // If for some reason the Xbox Render Target is not set, fallback to the backbuffer
-        if (g_pXbox_RenderTarget == xbnullptr) {
-            LOG_TEST_CASE("SetRenderTarget fallback to backbuffer");
-            g_pXbox_RenderTarget = g_pXbox_BackBufferSurface;
-        }
-
-		DWORD HostRenderTarget_Width, HostRenderTarget_Height;
-		DWORD XboxRenderTarget_Width = GetPixelContainerWidth(g_pXbox_RenderTarget);
-		DWORD XboxRenderTarget_Height = GetPixelContainerHeight(g_pXbox_RenderTarget);
-		if (!GetHostRenderTargetDimensions(&HostRenderTarget_Width, &HostRenderTarget_Height)) {
-			HostRenderTarget_Width = XboxRenderTarget_Width;
-			HostRenderTarget_Height = XboxRenderTarget_Height;
-		}
-
-		for (uint32_t uiVertex = 0; uiVertex < uiVertexCount; uiVertex++) {
-			FLOAT *pVertexDataAsFloat = (FLOAT*)(&pHostVertexData[uiVertex * uiHostVertexStride]);
-
-			// Normalize texture coordinates in FVF stream
-			for (unsigned int i = 0; i < XTL::X_D3DTS_STAGECOUNT; i++) {
-				if (pActivePixelContainer[i].bTexIsLinear) {
-					auto pTextureSlot = &(pXboxVertexAttributeFormat->Slots[XTL::X_D3DVSDE_TEXCOORD0 + i]);
-					FLOAT *pVertexUVData = (FLOAT*)(((uintptr_t)pVertexDataAsFloat) + pTextureSlot->Offset);
-					switch (pActivePixelContainer[i].NrTexCoords) {
-					case 0:
-						LOG_TEST_CASE("Normalize 0D?");
-						break;
-					case 1:
-						LOG_TEST_CASE("Normalize 1D");
-						pVertexUVData[0] /= pActivePixelContainer[i].Width;
-						break;
-					case 2:
-						pVertexUVData[0] /= pActivePixelContainer[i].Width;
-						pVertexUVData[1] /= pActivePixelContainer[i].Height;
-						break;
-					case 3:
-						LOG_TEST_CASE("Normalize 3D");
-						// Test case : HeatShimmer
-						pVertexUVData[0] /= pActivePixelContainer[i].Width;
-						pVertexUVData[1] /= pActivePixelContainer[i].Height;
-						pVertexUVData[2] /= pActivePixelContainer[i].Depth;
-						break;
-					default:
-						LOG_TEST_CASE("Normalize ?D");
-						break;
-					}
-				}
-			}
-		}
-	}
-
     patchedStream.isValid = true;
     patchedStream.XboxPrimitiveType = pDrawContext->XboxPrimitiveType;
     patchedStream.pCachedXboxVertexData = pXboxVertexData;
@@ -791,6 +697,15 @@ void CxbxVertexBufferConverter::Apply(CxbxDrawContext *pDrawContext)
 
 void CxbxSetVertexAttribute(int Register, FLOAT a, FLOAT b, FLOAT c, FLOAT d)
 {
+	if (Register < 0) {
+		LOG_TEST_CASE("Register < 0");
+		return;
+	}
+	if (Register >= 16) {
+		LOG_TEST_CASE("Register >= 16");
+		return;
+	}
+
 	// Write these values to the NV2A registers, so that we read them back when needed
 	float* attribute_floats = HLE_get_NV2A_vertex_attribute_value_pointer(Register);
 	attribute_floats[0] = a;
@@ -802,8 +717,6 @@ void CxbxSetVertexAttribute(int Register, FLOAT a, FLOAT b, FLOAT c, FLOAT d)
 	// This allows us to implement Xbox functionality where SetVertexData4f can be used to specify attributes
 	// not present in the vertex declaration.
 	// We use range 193 and up to store these values, as Xbox shaders stop at c192!
-	if (Register < 0) LOG_TEST_CASE("Register < 0");
-	if (Register >= 16) LOG_TEST_CASE("Register >= 16");
 	g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_CONSTREG_VREGDEFAULTS_BASE + Register, attribute_floats, 1);
 }
 
