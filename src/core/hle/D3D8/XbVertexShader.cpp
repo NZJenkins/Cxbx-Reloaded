@@ -33,6 +33,7 @@
 #include "core\kernel\init\CxbxKrnl.h"
 #include "core\kernel\support\Emu.h"
 #include "core\hle\D3D8\Direct3D9\Direct3D9.h" // For g_Xbox_VertexShader_Handle
+#include "core\hle\D3D8\Direct3D9\RenderStates.h" // For XboxRenderStateConverter
 #include "core\hle\D3D8\Direct3D9\VertexShaderSource.h" // For g_VertexShaderSource
 #include "core\hle\D3D8\XbVertexBuffer.h" // For CxbxImpl_SetVertexData4f
 #include "core\hle\D3D8\XbVertexShader.h"
@@ -50,6 +51,7 @@
 
 // External symbols :
 extern XTL::X_STREAMINPUT g_Xbox_SetStreamSource[X_VSH_MAX_STREAMS]; // Declared in XbVertexBuffer.cpp
+extern XboxRenderStateConverter XboxRenderStates; // Declared in Direct3D9.cpp
 
 // Variables set by [D3DDevice|CxbxImpl]_SetVertexShaderInput() :
                     unsigned g_Xbox_SetVertexShaderInput_Count = 0; // Read by GetXboxVertexAttributes
@@ -1205,7 +1207,7 @@ static void CxbxSetVertexShaderPassthroughProgram()
 	CxbxSetVertexShaderSlots(&XboxShaderBinaryPassthrough[0], 0, sizeof(XboxShaderBinaryPassthrough) / X_VSH_INSTRUCTION_SIZE_BYTES);
 
 	extern float g_ZScale; // TMP glue
-	extern void ApplyXboxMultiSampleOffset(float& x, float& y); // TMP glue
+	extern float GetMultiSampleOffsetDelta(); // TMP glue
 
 	// Passthrough programs require scale and offset to be set in constants zero and one
 	// (Note, these are different from GetMultiSampleOffsetAndScale)
@@ -1215,10 +1217,13 @@ static void CxbxSetVertexShaderPassthroughProgram()
 	scale[2] = g_ZScale;
 	scale[3] = 1.0f;
 
+	float MultiSampleBias = 0.0f;
+	if (XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_MULTISAMPLEANTIALIAS) > 0) {
+		MultiSampleBias = GetMultiSampleOffsetDelta();
+	}
 	float offset[4];
-	offset[0] = g_Xbox_ScreenSpaceOffset_x;
-	offset[1] = g_Xbox_ScreenSpaceOffset_y;
-	ApplyXboxMultiSampleOffset(offset[0], offset[1]);
+	offset[0] = g_Xbox_ScreenSpaceOffset_x - MultiSampleBias;
+	offset[1] = g_Xbox_ScreenSpaceOffset_y - MultiSampleBias;
 	offset[2] = 0.0f;
 	offset[3] = 0.0f;
 #if 0  // TODO : Fix our calculations above, as with this enabled, XDK Ripple sample regresses!
