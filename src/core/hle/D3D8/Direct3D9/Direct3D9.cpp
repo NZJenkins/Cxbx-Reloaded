@@ -3439,7 +3439,7 @@ HRESULT WINAPI XTL::EMUPATCH(D3DDevice_GetVisibilityTestResult)
 // LTCG specific D3DDevice_LoadVertexShader function...
 // This uses a custom calling convention where parameter is passed in EAX, ECX
 // Test-case: Aggressive Inline
-VOID __stdcall XTL::EMUPATCH(D3DDevice_LoadVertexShader_0)
+__declspec(naked) VOID XTL::EMUPATCH(D3DDevice_LoadVertexShader_0)
 (
 )
 {
@@ -3447,11 +3447,20 @@ VOID __stdcall XTL::EMUPATCH(D3DDevice_LoadVertexShader_0)
     DWORD                       Address;
 
 	__asm {
-		mov Address, eax
+		push ebp
+		mov  ebp, esp
+		sub  esp, __LOCAL_SIZE
 		mov Handle, ecx
+		mov Address, eax
 	}
 
-	return EMUPATCH(D3DDevice_LoadVertexShader)(Handle, Address);
+	CxbxImpl_LoadVertexShader(Handle, Address);
+
+	__asm {
+		mov  esp, ebp
+		pop  ebp
+		ret
+	}
 }
 
 // This uses a custom calling convention where parameter is passed in EAX

@@ -199,7 +199,7 @@ VOID WINAPI EMUPATCH(D3DDevice_LoadVertexShader)
     DWORD                       Address
 );
 
-VOID __stdcall EMUPATCH(D3DDevice_LoadVertexShader_0)();
+VOID EMUPATCH(D3DDevice_LoadVertexShader_0)();
 VOID EMUPATCH(D3DDevice_LoadVertexShader_4)
 (
     DWORD                       Address
