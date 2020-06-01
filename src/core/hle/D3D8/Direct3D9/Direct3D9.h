@@ -214,8 +214,8 @@ VOID WINAPI EMUPATCH(D3DDevice_SelectVertexShader)
     DWORD                       Address
 );
 
-VOID __stdcall EMUPATCH(D3DDevice_SelectVertexShader_0)();
-VOID __stdcall EMUPATCH(D3DDevice_SelectVertexShader_4)
+VOID EMUPATCH(D3DDevice_SelectVertexShader_0)();
+VOID EMUPATCH(D3DDevice_SelectVertexShader_4)
 (
     DWORD                       Address
 );
@@ -348,7 +348,7 @@ VOID WINAPI EMUPATCH(D3DDevice_SetShaderConstantMode)
     XTL::X_VERTEXSHADERCONSTANTMODE Mode
 );
 
-VOID __stdcall EMUPATCH(D3DDevice_SetShaderConstantMode_0)();
+VOID EMUPATCH(D3DDevice_SetShaderConstantMode_0)();
 
 // ******************************************************************
 // * patch: D3DDevice_Reset
@@ -438,7 +438,11 @@ VOID WINAPI EMUPATCH(D3DDevice_SetVertexShaderConstant)
     DWORD       ConstantCount
 );
 
-VOID __stdcall EMUPATCH(D3DDevice_SetVertexShaderConstant_8)();
+VOID EMUPATCH(D3DDevice_SetVertexShaderConstant_8)
+(
+	CONST PVOID pConstantData,
+	DWORD       ConstantCount
+);
 
 // ******************************************************************
 // * patch: D3DDevice_SetVertexShaderConstant1
@@ -613,7 +617,7 @@ VOID WINAPI EMUPATCH(D3DDevice_SetTexture)
 	X_D3DBaseTexture  *pTexture
 );
 
-VOID WINAPI EMUPATCH(D3DDevice_SetTexture_4)
+VOID EMUPATCH(D3DDevice_SetTexture_4)
 (
 	X_D3DBaseTexture  *pTexture
 );
@@ -679,7 +683,7 @@ VOID WINAPI EMUPATCH(D3DDevice_SetVertexData4f)
 // ******************************************************************
 // * patch: D3DDevice_SetVertexData4f_16
 // ******************************************************************
-VOID WINAPI EMUPATCH(D3DDevice_SetVertexData4f_16)
+VOID EMUPATCH(D3DDevice_SetVertexData4f_16)
 (
 	FLOAT   a,
 	FLOAT   b,

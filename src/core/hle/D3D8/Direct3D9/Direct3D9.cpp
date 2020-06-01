@@ -3511,33 +3511,52 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_LoadVertexShader)
 // LTCG specific D3DDevice_SelectVertexShader function...
 // This uses a custom calling convention where parameter is passed in EAX, EBX
 // Test-case: Star Wars - Battlefront
-VOID __stdcall XTL::EMUPATCH(D3DDevice_SelectVertexShader_0)
-(
-)
+__declspec(naked) VOID XTL::EMUPATCH(D3DDevice_SelectVertexShader_0)()
 {
     DWORD                       Handle;
     DWORD                       Address;
 
-	__asm {
+	__asm { // prologue
+		push ebp
+		mov  ebp, esp
+		sub  esp, __LOCAL_SIZE
 		mov Handle, eax
 		mov Address, ebx
 	}
 
-	return EMUPATCH(D3DDevice_SelectVertexShader)(Handle, Address);
+	CxbxImpl_SelectVertexShader(Handle, Address);
+
+	__asm { // epilogue
+		mov  esp, ebp
+		pop  ebp
+		ret
+	}
 }
 
 // LTCG specific D3DDevice_SelectVertexShader function...
 // This uses a custom calling convention where parameter is passed in EAX
 // Test-case: Aggressive Inline
-VOID __stdcall XTL::EMUPATCH(D3DDevice_SelectVertexShader_4)
+__declspec(naked) VOID XTL::EMUPATCH(D3DDevice_SelectVertexShader_4)
 (
     DWORD                       Address
 )
 {
 	DWORD           Handle;
-	__asm mov Handle, eax;
 
-	return EMUPATCH(D3DDevice_SelectVertexShader)(Handle, Address);
+	__asm { // prologue
+		push ebp
+		mov  ebp, esp
+		sub  esp, __LOCAL_SIZE
+		mov Handle, eax
+	}
+
+	CxbxImpl_SelectVertexShader(Handle, Address);
+
+	__asm { // epilogue
+		mov  esp, ebp
+		pop  ebp
+		ret  4
+	}
 }
 
 // ******************************************************************
@@ -4015,16 +4034,23 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_SetViewport)
 
 // LTCG specific D3DDevice_SetShaderConstantMode function...
 // This uses a custom calling convention where parameter is passed in EAX
-VOID __stdcall XTL::EMUPATCH(D3DDevice_SetShaderConstantMode_0)
-(
-)
+__declspec(naked) VOID XTL::EMUPATCH(D3DDevice_SetShaderConstantMode_0)()
 {
 	XTL::X_VERTEXSHADERCONSTANTMODE param;
-	__asm {
+	__asm { // prologue
+		push ebp
+		mov  ebp, esp
+		sub  esp, __LOCAL_SIZE
 		mov param, eax;
 	}
 
-	return EMUPATCH(D3DDevice_SetShaderConstantMode)(param);
+	EMUPATCH(D3DDevice_SetShaderConstantMode)(param);
+
+	__asm { // epilogue
+		mov  esp, ebp
+		pop  ebp
+		ret
+	}
 }
 
 // ******************************************************************
@@ -4092,23 +4118,27 @@ HRESULT WINAPI XTL::EMUPATCH(D3DDevice_CreateVertexShader)
 // LTCG specific D3DDevice_SetVertexShaderConstant function...
 // This uses a custom calling convention where parameter is passed in EDX
 // Test-case: Murakumo
-VOID __stdcall XTL::EMUPATCH(D3DDevice_SetVertexShaderConstant_8)
+__declspec(naked) VOID XTL::EMUPATCH(D3DDevice_SetVertexShaderConstant_8)
 (
+	CONST PVOID pConstantData,
+	DWORD       ConstantCount
 )
 {
-	static uint32_t returnAddr;
+	INT Register;
 
-#ifdef _DEBUG_TRACE
-		__asm add esp, 4
-#endif
+	__asm { // prologue
+		push ebp
+		mov  ebp, esp
+		sub  esp, __LOCAL_SIZE
+		mov  Register, edx;
+	}
 
-	__asm {
-		pop returnAddr
-		push edx
-		call EmuPatch_D3DDevice_SetVertexShaderConstant
-		mov eax, 0
-		push returnAddr
-		ret
+	CxbxImpl_SetVertexShaderConstant(Register, pConstantData, ConstantCount);
+
+	__asm { // epilogue
+		mov  esp, ebp
+		pop  ebp
+		ret  8
 	}
 }
 
@@ -4220,26 +4250,44 @@ VOID __fastcall XTL::EMUPATCH(D3DDevice_SetVertexShaderConstantNotInlineFast)
 
 // LTCG specific D3DDevice_SetTexture function...
 // This uses a custom calling convention where parameter is passed in EAX
-// TODO: XB_trampoline plus Log function is not working due lost parameter in EAX.
 // Test-case: Metal Wolf Chaos
-VOID WINAPI XTL::EMUPATCH(D3DDevice_SetTexture_4)
+// Test case: Brothers in Arms RTH30 v1.01
+__declspec(naked) VOID XTL::EMUPATCH(D3DDevice_SetTexture_4)
 (
 	X_D3DBaseTexture  *pTexture
 )
 {
-	DWORD           Stage;
-	__asm mov Stage, eax;
+	DWORD Stage;
 
-	//LOG_FUNC_BEGIN
-	//	LOG_FUNC_ARG(Stage)
-	//	LOG_FUNC_ARG(pTexture)
-	//	LOG_FUNC_END;
+	__asm { // prologue
+		push ebp
+		mov  ebp, esp
+		sub  esp, __LOCAL_SIZE
+		// if other registers aren't saved
+		// we can't log or trampoline
+		pushad
+		pushfd
+		mov  Stage, eax
+	}
+
 	EmuLog(LOG_LEVEL::DEBUG, "D3DDevice_SetTexture_4(Stage : %d pTexture : %08x);", Stage, pTexture);
 
 	// Call the Xbox implementation of this function, to properly handle reference counting for us
-	//XB_TRMP(D3DDevice_SetTexture_4)(pTexture);
+	__asm {
+		push pTexture
+		mov eax, Stage
+		call XB_TRMP(D3DDevice_SetTexture_4);
+	}
 
 	g_pXbox_SetTexture[Stage] = pTexture;
+
+	__asm { // epilogue
+		popfd
+		popad
+		mov  esp, ebp
+		pop  ebp
+		ret  4
+	}
 }
 
 // ******************************************************************
@@ -4403,7 +4451,7 @@ extern NV2ADevice* g_NV2A;
 // ******************************************************************
 // * patch: D3DDevice_SetVertexData4f_16
 // ******************************************************************
-VOID WINAPI XTL::EMUPATCH(D3DDevice_SetVertexData4f_16)
+__declspec(naked) VOID XTL::EMUPATCH(D3DDevice_SetVertexData4f_16)
 (
 	FLOAT   a,
 	FLOAT   b,
@@ -4411,15 +4459,25 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_SetVertexData4f_16)
 	FLOAT   d
 )
 {
+	INT Register;
 	// This is an LTCG specific version of SetVertexData4f where the first param is passed in edi
-	int Register = 0;
-	__asm{
-		mov Register, edi
+	__asm { // prologue
+		push ebp
+		mov  ebp, esp
+		sub  esp, __LOCAL_SIZE
+		mov  Register, edi;
 	}
 
-	LOG_FORWARD("D3DDevice_SetVertexData4f");
+	// Can't call LOG_FORWARD
+	EmuLog(LOG_LEVEL::DEBUG, "D3DDevice_SetVertexData4f_16 forwarding to D3DDevice_SetVertexData4f");
 
 	EMUPATCH(D3DDevice_SetVertexData4f)(Register, a, b, c, d);
+
+	__asm { // epilogue
+		mov  esp, ebp
+		pop  ebp
+		ret  16
+	}
 }
 
 // ******************************************************************
