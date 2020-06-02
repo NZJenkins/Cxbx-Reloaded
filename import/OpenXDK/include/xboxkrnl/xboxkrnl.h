@@ -152,6 +152,7 @@ typedef long                            NTSTATUS;
 #define STATUS_USER_APC                  ((DWORD   )0x000000C0L)
 // The SCSI input buffer was too large (not necessarily an error!)
 #define STATUS_DATA_OVERRUN              ((DWORD   )0xC000003CL)
+#define STATUS_SEMAPHORE_LIMIT_EXCEEDED  ((DWORD   )0xC0000047L)
 #define STATUS_INVALID_IMAGE_FORMAT      ((DWORD   )0xC000007BL)
 #define STATUS_INSUFFICIENT_RESOURCES    ((DWORD   )0xC000009AL)
 #define STATUS_TOO_MANY_SECRETS          ((DWORD   )0xC0000156L)
@@ -1279,9 +1280,9 @@ EVENT_BASIC_INFORMATION, *PEVENT_BASIC_INFORMATION;
 // ******************************************************************
 typedef struct _KSEMAPHORE
 {
-	DISPATCHER_HEADER Header;
-	LONG Limit;
-}
+	DISPATCHER_HEADER Header; // 0x00
+	LONG Limit;               // 0x10
+}                             // 0x14
 KSEMAPHORE, *PKSEMAPHORE, *RESTRICTED_POINTER PRKSEMAPHORE;
 
 // ******************************************************************
@@ -1310,13 +1311,13 @@ MUTANT_BASIC_INFORMATION, *PMUTANT_BASIC_INFORMATION;
 // ******************************************************************
 typedef struct _ERWLOCK
 {
-	LONG LockCount;
-	ULONG WritersWaitingCount;
-	ULONG ReadersWaitingCount;
-	ULONG ReadersEntryCount;
-	KEVENT WriterEvent;
-	KSEMAPHORE ReaderSemaphore;
-}
+	LONG LockCount;             // 0x00
+	ULONG WritersWaitingCount;  // 0x04
+	ULONG ReadersWaitingCount;  // 0x08
+	ULONG ReadersEntryCount;    // 0x0C
+	KEVENT WriterEvent;         // 0x10
+	KSEMAPHORE ReaderSemaphore; // 0x20
+}                               // 0x34
 ERWLOCK, *PERWLOCK;
 
 // ******************************************************************

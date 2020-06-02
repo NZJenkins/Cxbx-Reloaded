@@ -596,7 +596,7 @@ VOID CxbxInitWindow(bool bFullInit)
 		if (hRenderWindowThread == NULL) {
 			char szBuffer[1024] = { 0 };
 			sprintf(szBuffer, "Creating EmuRenderWindowThread Failed: %08X", GetLastError());
-			CxbxPopupMessage(LOG_LEVEL::FATAL, CxbxMsgDlgIcon_Error, szBuffer);
+			PopupFatal(nullptr, szBuffer);
 			EmuShared::Cleanup();
 			ExitProcess(0);
 		}
@@ -3924,7 +3924,9 @@ void CxbxUpdateHostViewPortOffsetAndScaleConstants()
 	// 59 (c-37) used for screen space transformation.
 	// We only do this if X_D3DSCM_NORESERVEDCONSTANTS is not set,
 	// since enabling this flag frees up these registers for shader use
-	if (g_Xbox_VertexShaderConstantMode != X_D3DSCM_NORESERVEDCONSTANTS) {
+	// Treat this as a flag
+	// Test Case: GTA III, Soldier of Fortune II
+	if (!(g_Xbox_VertexShaderConstantMode & X_D3DSCM_NORESERVEDCONSTANTS)) {
 		CxbxImpl_SetVertexShaderConstant(X_D3DSCM_RESERVED_CONSTANT_SCALE, vScale, 1);
 		CxbxImpl_SetVertexShaderConstant(X_D3DSCM_RESERVED_CONSTANT_OFFSET, vOffset, 1);
 	}

@@ -303,6 +303,7 @@
 #define IDC_RUMBLE_LIST                 1301
 #define IDC_RUMBLE_TEST                 1302
 #define IDC_NETWORK_ADAPTER             1303
+#define IDC_LOG_POPUP_TESTCASE          1304
 #define ID_FILE_EXIT                    40005
 #define ID_HELP_ABOUT                   40008
 #define ID_EMULATION_START              40009
@@ -364,6 +365,7 @@
 #define ID_SETTINGS_EXPERIMENTAL        40113
 #define ID_USELOADEREXEC                40114
 #define ID_SETTINGS_IGNOREINVALIDXBESIG 40115
+#define ID_SETTINGS_IGNOREINVALIDXBESEC 40116
 #define IDC_STATIC                      -1
 
 // Next default values for new objects
@@ -371,8 +373,8 @@
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        136
-#define _APS_NEXT_COMMAND_VALUE         40116
-#define _APS_NEXT_CONTROL_VALUE         1304
+#define _APS_NEXT_COMMAND_VALUE         40117
+#define _APS_NEXT_CONTROL_VALUE         1305
 #define _APS_NEXT_SYMED_VALUE           109
 #endif
 #endif

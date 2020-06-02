@@ -27,6 +27,8 @@
 // *
 // ******************************************************************
 
+#define LOG_PREFIX CXBXR_MODULE::CXBXR
+
 #include "Settings.hpp"
 #include "core\kernel\support\Emu.h"
 #include "EmuShared.h"
@@ -81,6 +83,7 @@ static struct {
 	const char* DataStorageToggle = "DataStorageToggle";
 	const char* DataCustomLocation = "DataCustomLocation";
 	const char* IgnoreInvalidXbeSig = "IgnoreInvalidXbeSig";
+	const char *IgnoreInvalidXbeSec = "IgnoreInvalidXbeSec";
 } sect_gui_keys;
 
 static const char* section_core = "core";
@@ -93,6 +96,7 @@ static struct {
 	const char* LoggedModules = "LoggedModules";
 	const char* LogLevel = "LogLevel";
 	const char* LoaderExecutable = "LoaderExecutable";
+	const char* LogPopupTestCase = "LogPopupTestCase";
 } sect_core_keys;
 
 static const char* section_video = "video";
@@ -220,7 +224,7 @@ bool Settings::Init()
 		bRet = LoadConfig();
 
 		if (!bRet) {
-			MessageBox(nullptr, szSettings_setup_error, "Cxbx-Reloaded", MB_OK);
+			PopupError(nullptr, szSettings_setup_error);
 			return false;
 		}
 
@@ -313,6 +317,7 @@ bool Settings::LoadConfig()
 	}
 
 	m_gui.bIgnoreInvalidXbeSig = m_si.GetBoolValue(section_gui, sect_gui_keys.IgnoreInvalidXbeSig, /*Default=*/false);
+	m_gui.bIgnoreInvalidXbeSec = m_si.GetBoolValue(section_gui, sect_gui_keys.IgnoreInvalidXbeSec, /*Default=*/false);
 
 	// ==== GUI End =============
 
@@ -355,6 +360,7 @@ bool Settings::LoadConfig()
 		m_core.LoggedModules[index] = 0;
 		index++;
 	}
+	m_core.bLogPopupTestCase = m_si.GetBoolValue(section_core, sect_core_keys.LogPopupTestCase, /*Default=*/true);
 
 	m_core.bUseLoaderExec = m_si.GetBoolValue(section_core, sect_core_keys.LoaderExecutable, /*Default=*/true);
 
@@ -514,6 +520,7 @@ bool Settings::Save(std::string file_path)
 	}
 
 	m_si.SetBoolValue(section_gui, sect_gui_keys.IgnoreInvalidXbeSig, m_gui.bIgnoreInvalidXbeSig, nullptr, true);
+	m_si.SetBoolValue(section_gui, sect_gui_keys.IgnoreInvalidXbeSec, m_gui.bIgnoreInvalidXbeSec, nullptr, true);
 
 	// ==== GUI End =============
 
@@ -534,6 +541,7 @@ bool Settings::Save(std::string file_path)
 		stream << "0x" << std::hex << m_core.LoggedModules[i];
 		m_si.SetValue(section_core, sect_core_keys.LoggedModules, stream.str().c_str(), nullptr, false);
 	}
+	m_si.SetBoolValue(section_core, sect_core_keys.LogPopupTestCase, m_core.bLogPopupTestCase, nullptr, true);
 
 	m_si.SetBoolValue(section_core, sect_core_keys.LoaderExecutable, m_core.bUseLoaderExec, nullptr, true);
 
@@ -831,13 +839,13 @@ CXBX_DATA Settings::SetupFile(std::string& file_path_out)
 	setupFile = GenerateExecDirectoryStr();
 
 #else // Only support for Qt compile build.
-	int iRet = MessageBox(nullptr, szSettings_save_user_option_message, "Cxbx-Reloaded", MB_YESNOCANCEL | MB_ICONQUESTION);
+	PopupReturn eRet = PopupQuestion(nullptr, szSettings_save_user_option_message);
 
-	if (iRet == IDYES) {
+	if (eRet == PopupReturn::Yes) {
 		setupFile = GenerateExecDirectoryStr();
 		data_ret = CXBX_DATA_EXECDIR;
 	}
-	else if (iRet == IDNO) {
+	else if (eRet == PopupReturn::No) {
 		setupFile = GenerateUserProfileDirectoryStr();
 		data_ret = CXBX_DATA_APPDATA;
 		if (setupFile.size() != 0) {
@@ -854,7 +862,7 @@ CXBX_DATA Settings::SetupFile(std::string& file_path_out)
 #endif
 
 	if (data_ret == CXBX_DATA_INVALID) {
-		MessageBox(nullptr, szSettings_setup_error, "Cxbx-Reloaded", MB_OK);
+		PopupError(nullptr, szSettings_setup_error);
 	}
 	else {
 		setupFile.append(szSettings_settings_file);
