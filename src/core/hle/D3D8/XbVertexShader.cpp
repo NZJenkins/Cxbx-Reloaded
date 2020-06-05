@@ -60,6 +60,7 @@ XTL::X_VERTEXATTRIBUTEFORMAT g_Xbox_SetVertexShaderInput_Attributes = { 0 }; // 
 
 // Variables set by [D3DDevice|CxbxImpl]_SetVertexShader() and [D3DDevice|CxbxImpl]_SelectVertexShader() :
                         bool g_Xbox_VertexShader_IsFixedFunction = true; // Corresponds to NV2A_ENGINE_FIXED / NV097_SET_TRANSFORM_EXECUTION_MODE_MODE_FIXED
+						bool g_Xbox_VertexShader_IsPassthrough = false;
                   XTL::DWORD g_Xbox_VertexShader_Handle = 0;
 #ifdef CXBX_USE_GLOBAL_VERTEXSHADER_POINTER // TODO : Would this be more accurate / simpler?
      XTL::X_D3DVertexShader *g_Xbox_VertexShader_Ptr = nullptr;
@@ -1128,7 +1129,7 @@ IDirect3DVertexDeclaration* CxbxCreateHostVertexDeclaration(D3DVERTEXELEMENT *pD
 
 	return pHostVertexDeclaration;
 }
-
+static IDirect3DVertexShader* passthroughshader;
 void CxbxUpdateHostVertexShader()
 {
 	// TODO Call this when state is dirty
@@ -1146,6 +1147,15 @@ void CxbxUpdateHostVertexShader()
 		// CxbxUpdateHostVertexDeclaration already been
 		// called, which sets host vertex declaration based on the
 		// declaration that XboxVertexShaderFromFVF generated. 
+	}
+	else if (g_Xbox_VertexShader_IsPassthrough) {
+		if (passthroughshader == nullptr) {
+			ID3DBlob* pBlob;
+			EmuCompileXboxPassthrough(&pBlob);
+			g_pD3DDevice->CreateVertexShader((DWORD*)pBlob->GetBufferPointer(), &passthroughshader);
+		}
+
+		HRESULT hRet = g_pD3DDevice->SetVertexShader(passthroughshader);
 	}
 	else {
 		auto pTokens = GetCxbxVertexShaderSlotPtr(g_Xbox_VertexShader_FunctionSlots_StartAddress);
@@ -1346,6 +1356,7 @@ void CxbxImpl_SelectVertexShader(DWORD Handle, DWORD Address)
 #endif
 		g_Xbox_VertexShader_Handle = Handle;
 		g_Xbox_VertexShader_IsFixedFunction = false;
+		g_Xbox_VertexShader_IsPassthrough = false;
 	}
 }
 
@@ -1432,7 +1443,7 @@ void CxbxImpl_SetVertexShader(DWORD Handle)
 	HRESULT hRet = D3D_OK;
 
 	XTL::X_D3DVertexShader* pXboxVertexShader = CxbxGetXboxVertexShaderForHandle(Handle);
-
+	g_Xbox_VertexShader_IsPassthrough = false;
 	if (pXboxVertexShader->Flags & X_VERTEXSHADER_FLAG_PROGRAM) {
 #if 0 // Since the D3DDevice_SetVertexShader patch already called it's trampoline, these calls have already been executed :
 		CxbxImpl_LoadVertexShader(Handle, 0);
@@ -1489,6 +1500,7 @@ void CxbxImpl_SetVertexShader(DWORD Handle)
 		if (pXboxVertexShader->Flags & X_VERTEXSHADER_FLAG_PASSTHROUGH) {
 			CxbxSetVertexShaderPassthroughProgram();
 			g_Xbox_VertexShader_IsFixedFunction = false;
+			g_Xbox_VertexShader_IsPassthrough = true;
 		} else if (pXboxVertexShader->Flags & X_VERTEXSHADER_FLAG_UNKNOWN) {
 			// Test-case : Amped
 			LOG_TEST_CASE("unknown vertex shader flag (4)");
