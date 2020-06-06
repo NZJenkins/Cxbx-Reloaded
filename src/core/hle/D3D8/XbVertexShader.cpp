@@ -657,7 +657,7 @@ private:
 	{
 		UsageIndex = 0;
 		switch (VertexRegister) {
-			case XTL::X_D3DVSDE_POSITION    /*= 0*/:                 return (pRecompiled->Type == D3DDECLTYPE_FLOAT4) ? D3DDECLUSAGE_POSITIONT : D3DDECLUSAGE_POSITION;
+			case XTL::X_D3DVSDE_POSITION    /*= 0*/:                 return D3DDECLUSAGE_POSITION;
 			case XTL::X_D3DVSDE_BLENDWEIGHT /*= 1*/:                 return D3DDECLUSAGE_BLENDWEIGHT;
 			case XTL::X_D3DVSDE_NORMAL      /*= 2*/:                 return D3DDECLUSAGE_NORMAL;
 			case XTL::X_D3DVSDE_DIFFUSE     /*= 3*/:                 return D3DDECLUSAGE_COLOR;
