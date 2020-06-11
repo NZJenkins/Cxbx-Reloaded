@@ -269,10 +269,17 @@ float4 reverseScreenspaceTransform(float4 oPos)
 	// mad oPos.xyz, r12, r1.x, c-37
 	// where c-37 and c-38 are reserved transform values
 
-	oPos.xyz -= xboxViewportOffset.xyz; // reverse offset
-	oPos.xyz *= oPos.w; // reverse perspective divide
-	oPos.xyz *= xboxViewportScaleInverse.xyz; // reverse scale
-
+	//oPos.xyz -= xboxViewportOffset.xyz; // reverse offset
+	//oPos.xyz *= oPos.w; // reverse perspective divide
+	//oPos.xyz *= xboxViewportScaleInverse.xyz; // reverse scale
+	
+	oPos /= float4(640, 480, 1, 1);
+	oPos.z *= xboxViewportScaleInverse.z;
+	//oPos.xy -= 0.5;
+	oPos.xy *= 2;
+	oPos.w = 1;
+	oPos.y *= -1;
+	
 	return oPos;
 }
 
