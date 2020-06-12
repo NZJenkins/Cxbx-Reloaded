@@ -87,7 +87,7 @@ bool GetHostRenderTargetDimensions(DWORD* pHostWidth, DWORD* pHostHeight, IDirec
 uint32_t GetPixelContainerWidth(XTL::X_D3DPixelContainer* pPixelContainer);
 uint32_t GetPixelContainerHeight(XTL::X_D3DPixelContainer* pPixelContainer);
 
-void CxbxPatchedStream::Activate(CxbxDrawContext *pDrawContext, UINT uiStream) const
+void CxbxPatchedStream::Activate(CxbxDrawContext *pDrawContext, UINT HostStreamNumber) const
 {
 	//LOG_INIT // Allows use of DEBUG_D3DRESULT
 
@@ -99,7 +99,7 @@ void CxbxPatchedStream::Activate(CxbxDrawContext *pDrawContext, UINT uiStream) c
 	}
 	else {
 		HRESULT hRet = g_pD3DDevice->SetStreamSource(
-			uiStream, 
+			HostStreamNumber,
 			pCachedHostVertexBuffer, 
 			0, // OffsetInBytes
 			uiCachedHostVertexStride);
@@ -137,16 +137,17 @@ CxbxVertexBufferConverter::CxbxVertexBufferConverter()
     m_pCxbxVertexDeclaration = nullptr;
 }
 
+// TODO: CountActiveD3DStreams must be removed once we can rely on CxbxGetVertexDeclaration always being set
 int CountActiveD3DStreams()
 {
-	int lastStreamIndex = 0;
-	for (int i = 0; i < X_VSH_MAX_STREAMS; i++) {
-		if (GetXboxVertexStreamInput(i).VertexBuffer != xbnullptr) {
-			lastStreamIndex = i + 1;
+	int StreamCount = 0;
+	for (int XboxStreamNumber = 0; XboxStreamNumber < X_VSH_MAX_STREAMS; XboxStreamNumber++) {
+		if (GetXboxVertexStreamInput(XboxStreamNumber).VertexBuffer != xbnullptr) {
+			StreamCount++;
 		}
 	}
 
-	return lastStreamIndex;
+	return StreamCount;
 }
 
 UINT CxbxVertexBufferConverter::GetNbrStreams(CxbxDrawContext *pDrawContext)
@@ -157,16 +158,11 @@ UINT CxbxVertexBufferConverter::GetNbrStreams(CxbxDrawContext *pDrawContext)
 	}
 
 	CxbxVertexDeclaration *pDecl = CxbxGetVertexDeclaration();
-	if (CxbxVertexDeclarationNeedsPatching(pDecl)) {
-		if (pDecl->NumberOfVertexStreams <= X_VSH_MAX_STREAMS) {
-			return pDecl->NumberOfVertexStreams;
-		}
-
-		// If we reached here, pDecl was set,but with invalid data
-		LOG_TEST_CASE("NumberOfVertexStreams > 16");
-		return CountActiveD3DStreams();
+	if (pDecl) {
+		return pDecl->NumberOfVertexStreams;
     } 
 	
+	// TODO: This code and CountActiveD3DStreams must be removed once we can rely on CxbxGetVertexDeclaration always being set
 	if (g_Xbox_VertexShader_Handle) {
 		return CountActiveD3DStreams();
     }
@@ -238,18 +234,21 @@ void CxbxVertexBufferConverter::ConvertStream
 	extern D3DCAPS g_D3DCaps;
 
 	CxbxVertexShaderStreamInfo *pVertexShaderStreamInfo = nullptr;
+	UINT XboxStreamNumber = uiStream;
 	if (m_pCxbxVertexDeclaration != nullptr) {
-		if (uiStream > m_pCxbxVertexDeclaration->NumberOfVertexStreams + 1) {
+		if (uiStream > m_pCxbxVertexDeclaration->NumberOfVertexStreams) {
 			LOG_TEST_CASE("uiStream > NumberOfVertexStreams");
 			return;
 		}
 
 		pVertexShaderStreamInfo = &(m_pCxbxVertexDeclaration->VertexStreams[uiStream]);
+		XboxStreamNumber = pVertexShaderStreamInfo->XboxStreamIndex;
 	}
 
 	bool bNeedVertexPatching = (pVertexShaderStreamInfo != nullptr && pVertexShaderStreamInfo->NeedPatch);
 	bool bNeedStreamCopy = bNeedVertexPatching;
 
+	UINT HostStreamNumber = XboxStreamNumber; // Use Xbox stream index on host
 	uint8_t *pXboxVertexData = xbnullptr;
 	UINT uiXboxVertexStride = 0;
 	UINT uiVertexCount = 0;
@@ -260,7 +259,7 @@ void CxbxVertexBufferConverter::ConvertStream
 
     if (pDrawContext->pXboxVertexStreamZeroData != xbnullptr) {
 		// There should only be one stream (stream zero) in this case
-		if (uiStream != 0) {
+		if (XboxStreamNumber != 0) {
 			CxbxKrnlCleanup("Trying to patch a Draw..UP with more than stream zero!");
 		}
 
@@ -270,18 +269,18 @@ void CxbxVertexBufferConverter::ConvertStream
 		uiHostVertexStride = (bNeedVertexPatching) ? pVertexShaderStreamInfo->HostVertexStride : uiXboxVertexStride;
 		dwHostVertexDataSize = uiVertexCount * uiHostVertexStride;
 	} else {
-		XTL::X_STREAMINPUT& XboxStreamInput = GetXboxVertexStreamInput(uiStream);
+		XTL::X_STREAMINPUT& XboxStreamInput = GetXboxVertexStreamInput(XboxStreamNumber);
 		XTL::X_D3DVertexBuffer *pXboxVertexBuffer = XboxStreamInput.VertexBuffer;
         pXboxVertexData = (uint8_t*)GetDataFromXboxResource(pXboxVertexBuffer);
 		if (pXboxVertexData == xbnullptr) {
 			HRESULT hRet = g_pD3DDevice->SetStreamSource(
-				uiStream, 
+				HostStreamNumber,
 				nullptr, 
 				0, // OffsetInBytes
 				0);
 //			DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetStreamSource");
 			if (FAILED(hRet)) {
-				EmuLog(LOG_LEVEL::WARNING, "g_pD3DDevice->SetStreamSource(uiStream, nullptr, 0)");
+				EmuLog(LOG_LEVEL::WARNING, "g_pD3DDevice->SetStreamSource(HostStreamNumber, nullptr, 0)");
 			}
 
 			return;
@@ -312,7 +311,7 @@ void CxbxVertexBufferConverter::ConvertStream
         stream.uiCachedHostVertexStride = uiHostVertexStride;
         stream.bCacheIsStreamZeroDrawUP = true;
         stream.pCachedHostVertexStreamZeroData = pHostVertexData;
-        stream.Activate(pDrawContext, uiStream);
+        stream.Activate(pDrawContext, HostStreamNumber);
         return;
     }
 
@@ -336,7 +335,7 @@ void CxbxVertexBufferConverter::ConvertStream
         patchedStream.uiCachedXboxVertexStride == uiXboxVertexStride && // Make sure the Xbox Stride didn't change
         patchedStream.uiCachedXboxVertexDataSize == xboxVertexDataSize ) { // Make sure the Xbox Data Size also didn't change
         m_TotalCacheHits++;
-        patchedStream.Activate(pDrawContext, uiStream);
+        patchedStream.Activate(pDrawContext, HostStreamNumber);
         return;
     }
 
@@ -631,7 +630,7 @@ void CxbxVertexBufferConverter::ConvertStream
         patchedStream.pCachedHostVertexBuffer = pNewHostVertexBuffer;
     }
 
-	patchedStream.Activate(pDrawContext, uiStream);
+	patchedStream.Activate(pDrawContext, HostStreamNumber);
 }
 
 void CxbxVertexBufferConverter::Apply(CxbxDrawContext *pDrawContext)
@@ -667,8 +666,8 @@ void CxbxVertexBufferConverter::Apply(CxbxDrawContext *pDrawContext)
 		m_uiNbrStreams = X_VSH_MAX_STREAMS;
 	}
 
-    for(UINT uiStream = 0; uiStream < m_uiNbrStreams; uiStream++) {
-		ConvertStream(pDrawContext, uiStream);
+    for(UINT i = 0; i < m_uiNbrStreams; i++) {
+		ConvertStream(pDrawContext, i);
     }
 
 	if (pDrawContext->XboxPrimitiveType == XTL::X_D3DPT_QUADSTRIP) {
