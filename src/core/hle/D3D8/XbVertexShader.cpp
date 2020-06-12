@@ -85,7 +85,7 @@ static XTL::X_D3DVertexShader* XboxVertexShaderFromFVF(DWORD xboxFvf)
 {
 	using namespace XTL;
 
-	// Note : FVFs don't tessellate, all slots read from stream zero, therefor
+	// Note : FVFs don't tessellate, all slots read from stream zero, therefore
 	// the following zero-initialization of StreamIndex (like all other fields)
 	// is never updated below.
 	g_Xbox_VertexShader_ForFVF = { 0 };
