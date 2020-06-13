@@ -3853,18 +3853,30 @@ float GetZScaleForSurface(XTL::X_D3DSurface* pSurface)
 
 void GetViewportOffsetAndScale(float (&vOffset)[4], float(&vScale)[4])
 {
-	// Set default values based on rendertarget
-	// TODO confirm MSAA and SSAA increase XboxRenderTarget_Width
-	float xboxRenderTargetWidth = (float)GetPixelContainerWidth(g_pXbox_RenderTarget);
-	float xboxRenderTargetHeight = (float)GetPixelContainerHeight(g_pXbox_RenderTarget);
+	// Antialiasing mode affects the viewport offset and scale
+	float aaScaleX, aaScaleY;
+	float aaOffsetX, aaOffsetY;
+	GetMultiSampleOffsetAndScale(aaScaleX, aaScaleY, aaOffsetX, aaOffsetY);
+
+	// SSAA means we scale the viewport
+	// MSAA does not affect scaling
+	// Test case: Need for Speed: HP2
+	if (!(g_Xbox_MultiSampleType & XTL::X_D3DMULTISAMPLE_SAMPLING_SUPER)) {
+		aaScaleX = aaScaleY = 1;
+	}
+
+	float scaledX = g_CurrentViewport.X * aaScaleX;
+	float scaledY = g_CurrentViewport.Y * aaScaleY;
+	float scaledWidth = g_CurrentViewport.Width * aaScaleX;
+	float scaledHeight = g_CurrentViewport.Height * aaScaleY;
 
 	auto zRange = g_CurrentViewport.MaxZ - g_CurrentViewport.MinZ;
-	vScale[0] = g_CurrentViewport.Width / 2;
-	vScale[1] = -((float)g_CurrentViewport.Height) / 2;
+	vScale[0] = scaledWidth / 2;
+	vScale[1] = -scaledHeight / 2;
 	vScale[2] = g_ZScale / zRange; // depth buffer depth
 	vScale[3] = 1;
-	vOffset[0] = g_CurrentViewport.Width / 2 + g_CurrentViewport.X;
-	vOffset[1] = g_CurrentViewport.Height / 2 + g_CurrentViewport.Y;
+	vOffset[0] = scaledWidth / 2 + scaledX;
+	vOffset[1] = scaledHeight / 2 + scaledY;
 	vOffset[2] = -g_CurrentViewport.MinZ;
 	vOffset[3] = 0;
 }
@@ -3881,19 +3893,27 @@ void CxbxUpdateHostViewPortOffsetAndScaleConstants()
 	if (g_Xbox_VertexShader_IsPassthrough) {
 		isRHWTransformedPosition[0] = 1.0f;
 		//vScale[2] = 1.0f; // Passthrough should not scale Z
-		//vScale[1] *= -1;
 	}
 
-	// Set default values based on rendertarget
-	// TODO confirm MSAA and SSAA increase XboxRenderTarget_Width
-	float xboxRenderTargetWidth = (float) GetPixelContainerWidth(g_pXbox_RenderTarget);
-	float xboxRenderTargetHeight = (float)GetPixelContainerHeight(g_pXbox_RenderTarget);
+	// Get the screenspace width and height
+	float xboxScreenspaceWidth = (float) GetPixelContainerWidth(g_pXbox_RenderTarget);
+	float xboxScreenspaceHeight = (float)GetPixelContainerHeight(g_pXbox_RenderTarget);
+	// Multisampling (either MSAA or SSAA) affects the rendertarget size
+	// We only use the "real" rendertarget size with SSAA, otherwise we scale it away
+	// We don't have to account for multisampling for XYZRHW passthrough mode
+	if (g_Xbox_VertexShader_IsPassthrough || !(g_Xbox_MultiSampleType & XTL::X_D3DMULTISAMPLE_SAMPLING_SUPER)) {
+		float aaScaleX, aaScaleY;
+		GetMultiSampleScale(aaScaleX, aaScaleY);
+		xboxScreenspaceWidth /= aaScaleX;
+		xboxScreenspaceHeight /= aaScaleY;
+	}
 
-	// Get the inverse of the scale, to allow multiply instead of divide on GPU
-	float vScreenspaceScaleInverse[4] = { 1 / (xboxRenderTargetWidth / 2), 1 / (xboxRenderTargetHeight / 2), 1 / vScale[2], 1 / vScale[3] };
-	float vScreenspaceOffset[4] = { xboxRenderTargetWidth / 2, xboxRenderTargetHeight / 2, 0, 0 };
-	g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_VIEWPORT_SCALEINVERSE_MIRROR_BASE, vScreenspaceScaleInverse, CXBX_D3DVS_VIEWPORT_SCALE_MIRROR_SIZE);
-	g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_VIEWPORT_OFFSET_MIRROR_BASE, vScreenspaceOffset, CXBX_D3DVS_VIEWPORT_OFFSET_MIRROR_SIZE);
+	// Xbox outputs screenspace coordinates. We need to scale these back into normalized coordinates
+	// in our vertex shaders
+	// We should scale to (0, 2) range
+	// Use an inverse to allow multiply instead of divide on GPU
+	float screenspaceScaleInverse[4] = { 2 / xboxScreenspaceWidth, 2 / xboxScreenspaceHeight, 1 / vScale[2], 1 };
+	g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_VIEWPORT_SCALEINVERSE_MIRROR_BASE, screenspaceScaleInverse, CXBX_D3DVS_VIEWPORT_SCALE_MIRROR_SIZE);
 	g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_IS_RHW_TRANSFORMED_POSITION_BASE, isRHWTransformedPosition, CXBX_D3DVS_IS_RHW_TRANSFORMED_POSITION_SIZE);
 
 	// Store viewport offset and scale in constant registers 58 (c-38) and
@@ -3931,10 +3951,29 @@ void CxbxImpl_SetViewPort(XTL::X_D3DVIEWPORT8* pViewport)
 	float aaOffsetX, aaOffsetY;
 	GetMultiSampleOffsetAndScale(aaScaleX, aaScaleY, aaOffsetX, aaOffsetY);
 
+	// Compute screen width and height
+	// FIXME SetViewport is called by the SetRenderTarget trampoline, but we aren't passed the render target here
+	// so we can't use its width and height if we need to!
+	DWORD xboxRenderTargetWidth = g_pXbox_RenderTarget ? GetPixelContainerWidth(g_pXbox_RenderTarget) : 640 * aaScaleX;
+	DWORD xboxRenderTargetHeight = g_pXbox_RenderTarget ? GetPixelContainerHeight(g_pXbox_RenderTarget) : 480 * aaScaleY;
+	float screenWidth = xboxRenderTargetWidth / aaScaleX;
+	float screenHeight = xboxRenderTargetHeight / aaScaleY;
+
 	// Host does not support pViewPort = nullptr
 	if (pViewport != nullptr) {
 		// Copy the Xbox viewport values over
 		g_CurrentViewport = *pViewport;
+
+		// Handle special case
+		const DWORD UnknownSpecialValue = 2147483647;
+		// What to do here?
+		// Scale existing value based on render target size difference?
+		if (g_CurrentViewport.Width == UnknownSpecialValue) {
+			g_CurrentViewport.Width = screenWidth;
+		}
+		if (g_CurrentViewport.Height == UnknownSpecialValue) {
+			g_CurrentViewport.Height = screenHeight;
+		}
 	}
 	else {
 		if (!g_pXbox_RenderTarget) {
@@ -3942,47 +3981,13 @@ void CxbxImpl_SetViewPort(XTL::X_D3DVIEWPORT8* pViewport)
 			return;
 		}
 
-		// Set default values based on rendertarget
-		// TODO confirm MSAA and SSAA increase XboxRenderTarget_Width
-		DWORD xboxRenderTargetWidth = GetPixelContainerWidth(g_pXbox_RenderTarget);
-		DWORD xboxRenderTargetHeight = GetPixelContainerHeight(g_pXbox_RenderTarget);
-
 		g_CurrentViewport.X = 0;
 		g_CurrentViewport.Y = 0;
-		// Rendertarget will be pre-scaled based on AA
-		// Scale it back, we'll conditionally reapply AA scale later
-		g_CurrentViewport.Width = xboxRenderTargetWidth / aaScaleX;
-		g_CurrentViewport.Height = xboxRenderTargetHeight / aaScaleY;
+		g_CurrentViewport.Width = screenWidth;
+		g_CurrentViewport.Height = screenHeight;
 		g_CurrentViewport.MinZ = 0;
 		g_CurrentViewport.MaxZ = 1;
 	}
-
-	// Handle special case
-	const DWORD UnknownSpecialValue = 2147483647;
-	// What to do here?
-	// Scale existing value based on render target size difference?
-	if (pViewport->Width == UnknownSpecialValue) {
-		g_CurrentViewport.Width = 640;
-	}
-	if (pViewport->Height == UnknownSpecialValue) {
-		g_CurrentViewport.Height = 480;
-	}
-
-	// SSAA means we scale the viewport
-	// MSAA apparently is handled transparently
-	// Test case: Need for Speed: HP2
-	// We shouldn't scale with MSAA
-	if (!(g_Xbox_MultiSampleType & XTL::X_D3DMULTISAMPLE_SAMPLING_SUPER)) {
-		aaScaleX = aaScaleY = 1;
-	}
-
-	//// Apply AA offset and scale
-	//g_CurrentViewport.X *= aaScaleX;
-	//g_CurrentViewport.Y *= aaScaleY;
-	//g_CurrentViewport.Width *= aaScaleX;
-	//g_CurrentViewport.Height *= aaScaleY;
-	//g_CurrentViewport.X += aaOffsetX;
-	//g_CurrentViewport.Y += aaOffsetY;
 }
 
 // LTCG specific D3DDevice_SetShaderConstantMode function...
@@ -6634,6 +6639,40 @@ void CxbxUpdateNativeD3DResources()
 	CxbxUpdateHostVertexShader();
 
 	CxbxUpdateHostVertexShaderConstants();
+
+	// FIXME hack
+	// We can't do Xbox viewport voodoo when relying on D3D9 fixed function
+	// So we have to set a viewport
+	if (g_Xbox_VertexShader_IsFixedFunction) {
+		// Antialiasing mode affects the viewport offset and scale
+		float aaScaleX, aaScaleY;
+		float aaOffsetX, aaOffsetY;
+		GetMultiSampleOffsetAndScale(aaScaleX, aaScaleY, aaOffsetX, aaOffsetY);
+		D3DVIEWPORT hostViewport = g_CurrentViewport;
+		hostViewport.X *= aaScaleX;
+		hostViewport.Y *= aaScaleY;
+		hostViewport.Width *= aaScaleX;
+		hostViewport.Height *= aaScaleY;
+		g_pD3DDevice->SetViewport(&hostViewport);
+	}
+	else {
+		// Set default viewport
+
+		DWORD HostRenderTarget_Width, HostRenderTarget_Height;
+		if (!GetHostRenderTargetDimensions(&HostRenderTarget_Width, &HostRenderTarget_Height)) {
+			LOG_TEST_CASE("For some reason we couldn't get the host render target dimensions");
+		}
+
+		D3DVIEWPORT hostViewport;
+		hostViewport.X = 0;
+		hostViewport.Y = 0;
+		hostViewport.Width = HostRenderTarget_Width;
+		hostViewport.Height = HostRenderTarget_Height;
+		hostViewport.MinZ = 0.0f;
+		hostViewport.MaxZ = 1.0f;
+
+		g_pD3DDevice->SetViewport(&hostViewport);
+	}
 
 	// NOTE: Order is important here
     // Some Texture States depend on RenderState values (Point Sprites)
