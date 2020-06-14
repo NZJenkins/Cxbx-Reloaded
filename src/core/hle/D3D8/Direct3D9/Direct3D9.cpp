@@ -3892,7 +3892,9 @@ void CxbxUpdateHostViewPortOffsetAndScaleConstants()
 
 	if (g_Xbox_VertexShader_IsPassthrough) {
 		isRHWTransformedPosition[0] = 1.0f;
-		//vScale[2] = 1.0f; // Passthrough should not scale Z
+		// Passthrough should not scale Z
+		// Test case: DoA3 character select
+		vScale[2] = 1.0f;
 	}
 
 	// Get the screenspace width and height
@@ -3942,44 +3944,42 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_SetViewport)
 	CxbxImpl_SetViewPort(pViewport);
 }
 
+// Nullptr sets the default viewport
 void CxbxImpl_SetViewPort(XTL::X_D3DVIEWPORT8* pViewport)
 {
 	LOG_INIT;
 
-	// Antialiasing mode affects the viewport offset and scale
-	float aaScaleX, aaScaleY;
-	float aaOffsetX, aaOffsetY;
-	GetMultiSampleOffsetAndScale(aaScaleX, aaScaleY, aaOffsetX, aaOffsetY);
-
-	// Compute screen width and height
-	// FIXME SetViewport is called by the SetRenderTarget trampoline, but we aren't passed the render target here
-	// so we can't use its width and height if we need to!
-	DWORD xboxRenderTargetWidth = g_pXbox_RenderTarget ? GetPixelContainerWidth(g_pXbox_RenderTarget) : 640 * aaScaleX;
-	DWORD xboxRenderTargetHeight = g_pXbox_RenderTarget ? GetPixelContainerHeight(g_pXbox_RenderTarget) : 480 * aaScaleY;
-	float screenWidth = xboxRenderTargetWidth / aaScaleX;
-	float screenHeight = xboxRenderTargetHeight / aaScaleY;
-
 	// Host does not support pViewPort = nullptr
 	if (pViewport != nullptr) {
+
+		// The SetRenderTarget trampoline seems to call this with
+		// Width and Height set to INT_MAX
+		// In our SetRenderTarget handling, we call this code to reset the viewport
+		// so don't have to worry about it
+		const DWORD UnknownSpecialValue = 2147483647;
+		if ((pViewport->Width == UnknownSpecialValue) ^ (pViewport->Height == UnknownSpecialValue)) {
+			LOG_TEST_CASE("SetViewport called with only one of width/height set to");
+		}
+
 		// Copy the Xbox viewport values over
 		g_CurrentViewport = *pViewport;
-
-		// Handle special case
-		const DWORD UnknownSpecialValue = 2147483647;
-		// What to do here?
-		// Scale existing value based on render target size difference?
-		if (g_CurrentViewport.Width == UnknownSpecialValue) {
-			g_CurrentViewport.Width = screenWidth;
-		}
-		if (g_CurrentViewport.Height == UnknownSpecialValue) {
-			g_CurrentViewport.Height = screenHeight;
-		}
 	}
 	else {
 		if (!g_pXbox_RenderTarget) {
 			LOG_TEST_CASE("null viewport with no rendertarget");
 			return;
 		}
+
+		// Antialiasing mode increases the rendertarget size, but we're only storing the nominal width and height
+		float aaScaleX, aaScaleY;
+		float aaOffsetX, aaOffsetY;
+		GetMultiSampleOffsetAndScale(aaScaleX, aaScaleY, aaOffsetX, aaOffsetY);
+
+		// Compute screen width and height
+		DWORD xboxRenderTargetWidth = GetPixelContainerWidth(g_pXbox_RenderTarget);
+		DWORD xboxRenderTargetHeight = GetPixelContainerHeight(g_pXbox_RenderTarget);
+		float screenWidth = xboxRenderTargetWidth / aaScaleX;
+		float screenHeight = xboxRenderTargetHeight / aaScaleY;
 
 		g_CurrentViewport.X = 0;
 		g_CurrentViewport.Y = 0;
@@ -7324,6 +7324,9 @@ void CxbxImpl_SetRenderTarget(XTL::X_D3DSurface* pRenderTarget, XTL::X_D3DSurfac
 			pRenderTarget = g_pXbox_BackBufferSurface;
 		}
     }
+
+	// Reset the viewport to default when the rendertarget changes
+	CxbxImpl_SetViewPort(nullptr);
 
 	pHostRenderTarget = GetHostSurface(pRenderTarget, D3DUSAGE_RENDERTARGET);
 
