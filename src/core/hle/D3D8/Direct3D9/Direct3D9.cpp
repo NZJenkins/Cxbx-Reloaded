@@ -3915,7 +3915,9 @@ void CxbxUpdateHostViewPortOffsetAndScaleConstants()
 	// We should scale to (0, 2) range
 	// Use an inverse to allow multiply instead of divide on GPU
 	float screenspaceScaleInverse[4] = { 2 / xboxScreenspaceWidth, 2 / xboxScreenspaceHeight, 1 / vScale[2], 1 };
+	float screenspaceOffset[4] = { -xboxScreenspaceWidth / 2, -xboxScreenspaceHeight / 2, -vOffset[2], 0 };
 	g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_VIEWPORT_SCALEINVERSE_MIRROR_BASE, screenspaceScaleInverse, CXBX_D3DVS_VIEWPORT_SCALE_MIRROR_SIZE);
+	g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_VIEWPORT_OFFSET_MIRROR_BASE, screenspaceOffset, CXBX_D3DVS_VIEWPORT_OFFSET_MIRROR_SIZE);
 	g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_IS_RHW_TRANSFORMED_POSITION_BASE, isRHWTransformedPosition, CXBX_D3DVS_IS_RHW_TRANSFORMED_POSITION_SIZE);
 
 	// Store viewport offset and scale in constant registers 58 (c-38) and

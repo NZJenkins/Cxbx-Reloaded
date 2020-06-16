@@ -382,14 +382,14 @@ float4 reverseScreenspaceTransform(float4 oPos)
 	// mad oPos.xyz, r12, r1.x, c-37
 	// where c-37 and c-38 are reserved transform values
 
-	// Scale to (0, 2) range
+	// Reverse screenspace offset
+	oPos += xboxViewportOffset;
+	// Reverse screenspace scale
 	oPos *= xboxViewportScaleInverse;
-	// Move to (-1, 1)
-	oPos.xy -= 1;
 	// Flip Y
 	oPos.y *= -1;
-	// Prevent D3D9 perspective division
-	oPos.w = 1;
+	// Reverse perspective divide
+	oPos.xyz *= oPos.w;
 
 	return oPos;
 }
