@@ -3951,6 +3951,24 @@ void CxbxImpl_SetViewPort(XTL::X_D3DVIEWPORT8* pViewport)
 {
 	LOG_INIT;
 
+	// We need a rendertarget to clamp the viewport and set default values
+	if (!g_pXbox_RenderTarget) {
+		// TODO should we do something here?
+		LOG_TEST_CASE("SetViewPort with no rendertarget");
+		return;
+	}
+
+	// Antialiasing mode increases the rendertarget size
+	// but we're only storing the nominal width and height
+	float aaScaleX, aaScaleY;
+	GetMultiSampleScale(aaScaleX, aaScaleY);
+
+	// Compute screen width and height
+	DWORD xboxRenderTargetWidth = GetPixelContainerWidth(g_pXbox_RenderTarget);
+	DWORD xboxRenderTargetHeight = GetPixelContainerHeight(g_pXbox_RenderTarget);
+	DWORD screenWidth = xboxRenderTargetWidth / aaScaleX;
+	DWORD screenHeight = xboxRenderTargetHeight / aaScaleY;
+
 	// Host does not support pViewPort = nullptr
 	if (pViewport != nullptr) {
 
@@ -3965,23 +3983,15 @@ void CxbxImpl_SetViewPort(XTL::X_D3DVIEWPORT8* pViewport)
 
 		// Copy the Xbox viewport values over
 		g_CurrentViewport = *pViewport;
+
+		// Cap width and height to screen bounds
+		// Test case: Need for Speed: HP2 (rear view mirror)
+		g_CurrentViewport.Width = std::min(g_CurrentViewport.Width, screenWidth - g_CurrentViewport.X);
+		g_CurrentViewport.Height = std::min(g_CurrentViewport.Height, screenHeight - g_CurrentViewport.Y);
 	}
 	else {
-		if (!g_pXbox_RenderTarget) {
-			LOG_TEST_CASE("null viewport with no rendertarget");
-			return;
-		}
+		// Use default values
 
-		// Antialiasing mode increases the rendertarget size, but we're only storing the nominal width and height
-		float aaScaleX, aaScaleY;
-		float aaOffsetX, aaOffsetY;
-		GetMultiSampleOffsetAndScale(aaScaleX, aaScaleY, aaOffsetX, aaOffsetY);
-
-		// Compute screen width and height
-		DWORD xboxRenderTargetWidth = GetPixelContainerWidth(g_pXbox_RenderTarget);
-		DWORD xboxRenderTargetHeight = GetPixelContainerHeight(g_pXbox_RenderTarget);
-		float screenWidth = xboxRenderTargetWidth / aaScaleX;
-		float screenHeight = xboxRenderTargetHeight / aaScaleY;
 
 		g_CurrentViewport.X = 0;
 		g_CurrentViewport.Y = 0;
