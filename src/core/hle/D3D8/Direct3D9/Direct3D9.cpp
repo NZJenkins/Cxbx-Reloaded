@@ -3870,10 +3870,15 @@ void GetViewportOffsetAndScale(float (&vOffset)[4], float(&vScale)[4])
 	float scaledWidth = g_CurrentViewport.Width * aaScaleX;
 	float scaledHeight = g_CurrentViewport.Height * aaScaleY;
 
+	// D3D9 viewport info
+	https://docs.microsoft.com/en-us/windows/win32/direct3d9/viewports-and-clipping
+	// Unlike D3D9, Xbox should scales by the z buffer scale
+	// Test case: GTA III
+
 	auto zRange = g_CurrentViewport.MaxZ - g_CurrentViewport.MinZ;
 	vScale[0] = scaledWidth / 2;
 	vScale[1] = -scaledHeight / 2;
-	vScale[2] = g_ZScale / zRange; // depth buffer depth
+	vScale[2] = zRange > 0 ? g_ZScale / zRange : g_ZScale; // avoid divide by 0
 	vScale[3] = 1;
 	vOffset[0] = scaledWidth / 2 + scaledX;
 	vOffset[1] = scaledHeight / 2 + scaledY;
