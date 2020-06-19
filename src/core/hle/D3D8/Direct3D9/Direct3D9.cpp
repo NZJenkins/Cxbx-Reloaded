@@ -2877,6 +2877,8 @@ float GetMultiSampleOffsetDelta()
 }
 
 XTL::X_D3DVIEWPORT8 g_CurrentViewport = { 0 };
+float g_BackbufferScaleX = 1;
+float g_BackbufferScaleY = 1;
 
 static inline void GetMultiSampleOffset(float& xOffset, float& yOffset)
 {
@@ -3390,7 +3392,8 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_SetBackBufferScale)(FLOAT x, FLOAT y)
 		LOG_FUNC_ARG(y)
 		LOG_FUNC_END;
 
-	LOG_IGNORED();
+	g_BackbufferScaleX = x;
+	g_BackbufferScaleY = y;
 }
 
 // ******************************************************************
@@ -3865,10 +3868,10 @@ void GetViewportOffsetAndScale(float (&vOffset)[4], float(&vScale)[4])
 		aaScaleX = aaScaleY = 1;
 	}
 
-	float scaledX = g_CurrentViewport.X * aaScaleX;
-	float scaledY = g_CurrentViewport.Y * aaScaleY;
-	float scaledWidth = g_CurrentViewport.Width * aaScaleX;
-	float scaledHeight = g_CurrentViewport.Height * aaScaleY;
+	float scaledX = g_CurrentViewport.X * aaScaleX * g_BackbufferScaleX;
+	float scaledY = g_CurrentViewport.Y * aaScaleY * g_BackbufferScaleY;
+	float scaledWidth = g_CurrentViewport.Width * aaScaleX * g_BackbufferScaleX;
+	float scaledHeight = g_CurrentViewport.Height * aaScaleY * g_BackbufferScaleY;
 
 	// D3D9 viewport info
 	https://docs.microsoft.com/en-us/windows/win32/direct3d9/viewports-and-clipping
@@ -3903,8 +3906,8 @@ void CxbxUpdateHostViewPortOffsetAndScaleConstants()
 	}
 
 	// Get the screenspace width and height
-	float xboxScreenspaceWidth = (float) GetPixelContainerWidth(g_pXbox_RenderTarget);
-	float xboxScreenspaceHeight = (float)GetPixelContainerHeight(g_pXbox_RenderTarget);
+	float xboxScreenspaceWidth = (float) GetPixelContainerWidth(g_pXbox_RenderTarget) * g_BackbufferScaleX;
+	float xboxScreenspaceHeight = (float)GetPixelContainerHeight(g_pXbox_RenderTarget) * g_BackbufferScaleY;
 	// Multisampling (either MSAA or SSAA) affects the rendertarget size
 	// We only use the "real" rendertarget size with SSAA, otherwise we scale it away
 	// We don't have to account for multisampling for XYZRHW passthrough mode
