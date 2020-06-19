@@ -3960,6 +3960,11 @@ void CxbxImpl_SetViewPort(XTL::X_D3DVIEWPORT8* pViewport)
 	if (!g_pXbox_RenderTarget) {
 		// TODO should we do something here?
 		LOG_TEST_CASE("SetViewPort with no rendertarget");
+
+		if (pViewport->X != 0 || pViewport->Y != 0) {
+			// LOG_TEST_CASE("we're losing some information");
+			CxbxKrnlCleanup("we're losing some information");
+		}
 		return;
 	}
 
