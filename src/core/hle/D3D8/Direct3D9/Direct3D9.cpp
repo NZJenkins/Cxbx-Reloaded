@@ -6660,17 +6660,21 @@ void CxbxUpdateNativeD3DResources()
 	// FIXME hack
 	// We can't do Xbox viewport voodoo when relying on D3D9 fixed function
 	// So we have to set a viewport
+	// Antialiasing mode affects the viewport offset and scale
+	float aaScaleX, aaScaleY;
+	float aaOffsetX, aaOffsetY;
+	GetMultiSampleOffsetAndScale(aaScaleX, aaScaleY, aaOffsetX, aaOffsetY);
 	if (g_Xbox_VertexShader_IsFixedFunction) {
-		// Antialiasing mode affects the viewport offset and scale
-		float aaScaleX, aaScaleY;
-		float aaOffsetX, aaOffsetY;
-		GetMultiSampleOffsetAndScale(aaScaleX, aaScaleY, aaOffsetX, aaOffsetY);
 		D3DVIEWPORT hostViewport = g_CurrentViewport;
 		hostViewport.X *= aaScaleX;
 		hostViewport.Y *= aaScaleY;
 		hostViewport.Width *= aaScaleX;
 		hostViewport.Height *= aaScaleY;
 		g_pD3DDevice->SetViewport(&hostViewport);
+
+		// Reset scissor rect
+		RECT viewportRect = { 0 };
+		g_pD3DDevice->SetScissorRect(&viewportRect);
 	}
 	else {
 		// Set default viewport
@@ -6689,6 +6693,16 @@ void CxbxUpdateNativeD3DResources()
 		hostViewport.MaxZ = 1.0f;
 
 		g_pD3DDevice->SetViewport(&hostViewport);
+
+		// TODO remove?
+		// Hack around fullscreen viewport not clipping
+		g_pD3DDevice->SetRenderState(D3DRS_SCISSORTESTENABLE, TRUE);
+		RECT viewportRect;
+		viewportRect.left = g_CurrentViewport.X * aaScaleX;
+		viewportRect.top = g_CurrentViewport.Y * aaScaleY;
+		viewportRect.right = viewportRect.left + g_CurrentViewport.Width * aaScaleX;
+		viewportRect.bottom = viewportRect.top + g_CurrentViewport.Height * aaScaleY;
+		g_pD3DDevice->SetScissorRect(&viewportRect);
 	}
 
 	// NOTE: Order is important here
