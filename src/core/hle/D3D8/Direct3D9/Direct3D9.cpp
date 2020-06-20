@@ -6672,6 +6672,12 @@ void CxbxUpdateNativeD3DResources()
 	float aaScaleX, aaScaleY;
 	float aaOffsetX, aaOffsetY;
 	GetMultiSampleOffsetAndScale(aaScaleX, aaScaleY, aaOffsetX, aaOffsetY);
+
+	DWORD HostRenderTarget_Width, HostRenderTarget_Height;
+	if (!GetHostRenderTargetDimensions(&HostRenderTarget_Width, &HostRenderTarget_Height)) {
+		LOG_TEST_CASE("For some reason we couldn't get the host render target dimensions");
+	}
+
 	if (g_Xbox_VertexShader_IsFixedFunction) {
 		D3DVIEWPORT hostViewport = g_CurrentViewport;
 		hostViewport.X *= aaScaleX;
@@ -6681,16 +6687,15 @@ void CxbxUpdateNativeD3DResources()
 		g_pD3DDevice->SetViewport(&hostViewport);
 
 		// Reset scissor rect
-		RECT viewportRect = { 0 };
+		RECT viewportRect;
+		viewportRect.left = 0;
+		viewportRect.top = 0;
+		viewportRect.right = HostRenderTarget_Width;
+		viewportRect.bottom = HostRenderTarget_Height;
 		g_pD3DDevice->SetScissorRect(&viewportRect);
 	}
 	else {
 		// Set default viewport
-
-		DWORD HostRenderTarget_Width, HostRenderTarget_Height;
-		if (!GetHostRenderTargetDimensions(&HostRenderTarget_Width, &HostRenderTarget_Height)) {
-			LOG_TEST_CASE("For some reason we couldn't get the host render target dimensions");
-		}
 
 		D3DVIEWPORT hostViewport;
 		hostViewport.X = 0;
@@ -6706,10 +6711,10 @@ void CxbxUpdateNativeD3DResources()
 		// Hack around fullscreen viewport not clipping
 		g_pD3DDevice->SetRenderState(D3DRS_SCISSORTESTENABLE, TRUE);
 		RECT viewportRect;
-		viewportRect.left = g_CurrentViewport.X * aaScaleX;
-		viewportRect.top = g_CurrentViewport.Y * aaScaleY;
-		viewportRect.right = viewportRect.left + g_CurrentViewport.Width * aaScaleX;
-		viewportRect.bottom = viewportRect.top + g_CurrentViewport.Height * aaScaleY;
+		viewportRect.left = g_CurrentViewport.X * aaScaleX * g_RenderScaleFactor;
+		viewportRect.top = g_CurrentViewport.Y * aaScaleY * g_RenderScaleFactor;
+		viewportRect.right = viewportRect.left + g_CurrentViewport.Width * aaScaleX * g_RenderScaleFactor;
+		viewportRect.bottom = viewportRect.top + g_CurrentViewport.Height * aaScaleY * g_RenderScaleFactor;
 		g_pD3DDevice->SetScissorRect(&viewportRect);
 	}
 
