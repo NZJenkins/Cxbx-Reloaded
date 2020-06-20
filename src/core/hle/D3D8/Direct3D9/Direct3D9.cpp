@@ -6680,10 +6680,10 @@ void CxbxUpdateNativeD3DResources()
 
 	if (g_Xbox_VertexShader_IsFixedFunction) {
 		D3DVIEWPORT hostViewport = g_CurrentViewport;
-		hostViewport.X *= aaScaleX;
-		hostViewport.Y *= aaScaleY;
-		hostViewport.Width *= aaScaleX;
-		hostViewport.Height *= aaScaleY;
+		hostViewport.X *= (aaScaleX * g_RenderScaleFactor * g_BackbufferScaleX);
+		hostViewport.Y *= (aaScaleY * g_RenderScaleFactor * g_BackbufferScaleY);
+		hostViewport.Width *= (aaScaleX * g_RenderScaleFactor * g_BackbufferScaleX);
+		hostViewport.Height *= (aaScaleY * g_RenderScaleFactor * g_BackbufferScaleY);
 		g_pD3DDevice->SetViewport(&hostViewport);
 
 		// Reset scissor rect
