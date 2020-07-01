@@ -3908,8 +3908,8 @@ void CxbxUpdateHostViewPortOffsetAndScaleConstants()
 	// We only do this if X_D3DSCM_NORESERVEDCONSTANTS is not set,
 	// since enabling this flag frees up these registers for shader use
 	if (!(g_Xbox_VertexShaderConstantMode & X_D3DSCM_NORESERVEDCONSTANTS)) {
-		CxbxImpl_SetVertexShaderConstant(X_D3DSCM_RESERVED_CONSTANT_SCALE, vScale, 1);
-		CxbxImpl_SetVertexShaderConstant(X_D3DSCM_RESERVED_CONSTANT_OFFSET, vOffset, 1);
+		g_pD3DDevice->SetVertexShaderConstantF(X_D3DSCM_RESERVED_CONSTANT_SCALE_CORRECTED, vScale, 1);
+		g_pD3DDevice->SetVertexShaderConstantF(X_D3DSCM_RESERVED_CONSTANT_OFFSET_CORRECTED, vOffset, 1);
 	}
 
 	// Get the inverse of the scale, to allow multiply instead of divide on GPU
@@ -6627,15 +6627,9 @@ extern float* HLE_get_NV2A_vertex_constant_float4_ptr(unsigned const_index); // 
 // remove our patches on D3DDevice_SetVertexShaderConstant (and CxbxImpl_SetVertexShaderConstant)
 void CxbxUpdateHostVertexShaderConstants()
 {
-	CxbxUpdateHostViewPortOffsetAndScaleConstants();
-
 	// Transfer all constants that have been flagged dirty to host
 	auto nv2a = g_NV2A->GetDeviceState();
 	for (int i = 0; i < X_D3DVS_CONSTREG_COUNT; i++) {
-		// Note : We don't skip X_D3DSCM_RESERVED_CONSTANT_OFFSET_CORRECTED and
-		// X_D3DSCM_RESERVED_CONSTANT_SCALE_CORRECTED constant indices, as these
-		// are already updated by CxbxUpdateHostViewPortOffsetAndScaleConstants
-		// and should just be transferred to host like any other
 		if (nv2a->pgraph.vsh_constants_dirty[i]) {
 			nv2a->pgraph.vsh_constants_dirty[i] = false;
 
@@ -6645,6 +6639,16 @@ void CxbxUpdateHostVertexShaderConstants()
 			g_pD3DDevice->SetVertexShaderConstantF(i, constant_floats, 1);
 		}
 	}
+
+	// FIXME our viewport constants don't match Xbox values
+	// If we write them to pgraph constants, like we do with constants set by the title,
+	// the Xbox could overwrite them (at any time?) and we get flickering geometry.
+	// For now, set our viewport constants directly in the call below,
+	// overwriting whatever was in pgraph
+	// Test case:
+	// Xbox dashboard (during initial fade from black)
+	// Need for Speed: Hot Pursuit 2 (car select)
+	CxbxUpdateHostViewPortOffsetAndScaleConstants();
 }
 
 extern void CxbxUpdateHostVertexDeclaration(); // TMP glue
