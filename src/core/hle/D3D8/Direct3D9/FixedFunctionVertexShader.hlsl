@@ -1,13 +1,11 @@
 #include "FixedFunctionVertexShaderState.cpp"
 
 // Default values for vertex registers, and whether to use them
-uniform float4 vRegisterDefaultValues[16] : register(c192); // Matches CXBX_D3DVS_ATTRDATA_BASE
-uniform float4 vRegisterDefaultFlagsPacked[4] : register(c208); // Matches CXBX_D3DVS_ATTRFLAG_BASE
+uniform float4 vRegisterDefaultValues[16] : register(c192);
+uniform float4 vRegisterDefaultFlagsPacked[4] : register(c208);
+uniform float4 xboxTextureScale[4] : register(c214);
 
-//uniform float4 xboxViewportScale   : register(c212); // Matches CXBX_D3DVS_VIEWPORT_MIRROR_SCALE_BASE
-//uniform float4 xboxViewportOffset  : register(c213); // Matches CXBX_D3DVS_VIEWPORT_MIRROR_OFFSET_BASE
-
-uniform RenderStateBlock state : register(c0); // Matches CXBX_D3DVS_FIXEDFUNCSTATE_BASE
+uniform FixedFunctionVertexShaderState state : register(c0);
 
 #undef CXBX_ALL_TEXCOORD_INPUTS // Enable this to disable semantics in VS_INPUT (instead, we'll use an array of generic TEXCOORD's)
 
@@ -587,11 +585,10 @@ VS_OUTPUT main(const VS_INPUT xInput)
 
     // xOut.oD0 = float4(world.Normal, 1);
 
-	// TODO reverse scaling for linear textures
-    xOut.oT0 = DoTexCoord(0, xIn);
-    xOut.oT1 = DoTexCoord(1, xIn);
-    xOut.oT2 = DoTexCoord(2, xIn);
-    xOut.oT3 = DoTexCoord(3, xIn);
+    xOut.oT0 = DoTexCoord(0, xIn) / xboxTextureScale[0];
+    xOut.oT1 = DoTexCoord(1, xIn) / xboxTextureScale[1];
+    xOut.oT2 = DoTexCoord(2, xIn) / xboxTextureScale[2];
+    xOut.oT3 = DoTexCoord(3, xIn) / xboxTextureScale[3];
 
 	return xOut;
 }

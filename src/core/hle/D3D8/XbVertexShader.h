@@ -201,6 +201,7 @@ inline boolean VshHandleIsVertexShader(DWORD Handle) { return (Handle & X_D3DFVF
 inline XTL::X_D3DVertexShader *VshHandleToXboxVertexShader(DWORD Handle) { return (XTL::X_D3DVertexShader *)(Handle & ~X_D3DFVF_RESERVED0);}
 
 extern bool g_Xbox_VertexShader_IsFixedFunction;
+extern bool g_bUseFixedFunctionVertexShader;
 
 extern CxbxVertexDeclaration* CxbxGetVertexDeclaration();
 extern XTL::X_STREAMINPUT& GetXboxVertexStreamInput(unsigned XboxStreamNumber);
