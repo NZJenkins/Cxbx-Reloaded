@@ -74,6 +74,8 @@ XTL::X_VERTEXATTRIBUTEFORMAT g_Xbox_SetVertexShaderInput_Attributes = { 0 }; // 
 				  float g_Xbox_ScreenSpaceOffset_x = 0.0f;
 				  float g_Xbox_ScreenSpaceOffset_y = 0.0f;
 
+// Toggles between shader-based fixed function and D3D9 fixed function implementation
+bool g_bUseFixedFunctionVertexShader = true;
 
 static XTL::X_D3DVertexShader g_Xbox_VertexShader_ForFVF = {};
 
@@ -1089,21 +1091,32 @@ void CxbxUpdateHostVertexShader()
 {
 	extern bool g_bUsePassthroughHLSL; // TMP glue
 
+	static IDirect3DVertexShader* pFixedFunctionShader = nullptr;
+
 	// TODO Call this when state is dirty
 	// Rather than every time state changes
 
 	LOG_INIT; // Allows use of DEBUG_D3DRESULT
 
 	if (g_Xbox_VertexShader_IsFixedFunction) {
-		HRESULT hRet = g_pD3DDevice->SetVertexShader(nullptr);
+		HRESULT hRet;
+
+		if (!pFixedFunctionShader) {
+			ID3DBlob* pCompiledShader;
+			EmuCompileXboxFixedFunction(&pCompiledShader);
+			auto hRet = g_pD3DDevice->CreateVertexShader((DWORD*)pCompiledShader->GetBufferPointer(), &pFixedFunctionShader);
+
+			if (hRet != D3D_OK)
+				CxbxKrnlCleanup("Setting fixed function shader failed");
+		}
+
+		// Toggle fixed function implementation (shader vs D3D9)
+		if(g_bUseFixedFunctionVertexShader)
+			hRet = g_pD3DDevice->SetVertexShader(pFixedFunctionShader);
+		else
+			hRet = g_pD3DDevice->SetVertexShader(nullptr);
+
 		DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetVertexShader");
-		// TODO : Once available, start using host Fixed Function HLSL shader
-		// instead of using deprecated host fixed function (by setting a null
-		// vertex shader).
-		// As for the required host vertex declaration : 
-		// CxbxUpdateHostVertexDeclaration already been
-		// called, which sets host vertex declaration based on the
-		// declaration that XboxVertexShaderFromFVF generated. 
 	}
 	else if (g_Xbox_VertexShader_IsPassthrough && g_bUsePassthroughHLSL) {
 		if (passthroughshader == nullptr) {

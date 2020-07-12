@@ -172,3 +172,28 @@ set(CXBXR_GLEW_DLL "${CXBXR_ROOT_DIR}/import/glew-2.0.0/bin/Release/Win32/glew32
 add_custom_command(TARGET cxbxr-emu POST_BUILD
  COMMAND ${CMAKE_COMMAND} -E copy ${CXBXR_GLEW_DLL} $<TARGET_FILE_DIR:cxbxr-emu>
 )
+
+# TODO remove repetition
+# HLSL compilation
+# Don't build HLSL files, though include them in Visual Studio
+set_source_files_properties(
+  "${CXBXR_ROOT_DIR}/src/core/hle/D3D8/Direct3D9/CxbxVertexShaderTemplate.hlsl"
+  "${CXBXR_ROOT_DIR}/src/core/hle/D3D8/Direct3D9/FixedFunctionVertexShader.hlsl" 
+  PROPERTIES HEADER_FILE_ONLY TRUE
+)
+
+# TODO this doesn't run when files are changed
+# Copy the fixed function shader files to a directory
+# As it's too large to #include as a string
+add_custom_command(TARGET cxbxr-emu POST_BUILD 
+ COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:cxbxr-emu>/hlsl)
+add_custom_command(TARGET cxbxr-emu POST_BUILD
+ COMMAND ${CMAKE_COMMAND} -E copy_if_different 
+ "${CXBXR_ROOT_DIR}/src/core/hle/D3D8/Direct3D9/FixedFunctionVertexShader.hlsl"
+ $<TARGET_FILE_DIR:cxbxr-emu>/hlsl
+)
+add_custom_command(TARGET cxbxr-emu POST_BUILD
+ COMMAND ${CMAKE_COMMAND} -E copy_if_different
+ "${CXBXR_ROOT_DIR}/src/core/hle/D3D8/Direct3D9/FixedFunctionVertexShaderState.cpp"
+ $<TARGET_FILE_DIR:cxbxr-emu>/hlsl
+)

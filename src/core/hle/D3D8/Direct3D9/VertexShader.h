@@ -24,4 +24,6 @@ extern HRESULT EmuCompileShader
 
 extern HRESULT EmuCompileXboxPassthrough(ID3DBlob** ppHostShader);
 
+extern void EmuCompileXboxFixedFunction(ID3DBlob** ppHostShader);
+
 #endif

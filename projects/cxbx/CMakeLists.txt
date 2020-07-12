@@ -200,3 +200,18 @@ set(CXBXR_GLEW_DLL "${CXBXR_ROOT_DIR}/import/glew-2.0.0/bin/Release/Win32/glew32
 add_custom_command(TARGET cxbx POST_BUILD
  COMMAND ${CMAKE_COMMAND} -E copy ${CXBXR_GLEW_DLL} $<TARGET_FILE_DIR:cxbx>
 )
+
+# TODO remove repetition
+# HLSL compilation
+# Don't build HLSL files, though include them in Visual Studio
+set_source_files_properties(
+  "${CXBXR_ROOT_DIR}/src/core/hle/D3D8/Direct3D9/CxbxVertexShaderTemplate.hlsl"
+  "${CXBXR_ROOT_DIR}/src/core/hle/D3D8/Direct3D9/FixedFunctionVertexShader.hlsl" 
+  PROPERTIES HEADER_FILE_ONLY TRUE
+)
+
+add_custom_target(copy_hlsl ALL
+ COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:cxbx>/hlsl
+ COMMAND ${CMAKE_COMMAND} -E copy "${CXBXR_ROOT_DIR}/src/core/hle/D3D8/Direct3D9/FixedFunctionVertexShaderState.cpp" $<TARGET_FILE_DIR:cxbx>/hlsl
+ COMMAND ${CMAKE_COMMAND} -E copy "${CXBXR_ROOT_DIR}/src/core/hle/D3D8/Direct3D9/FixedFunctionVertexShader.hlsl" $<TARGET_FILE_DIR:cxbx>/hlsl
+)

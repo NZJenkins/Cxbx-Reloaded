@@ -70,6 +70,7 @@ namespace xboxkrnl
 #include "common\input\SdlJoystick.h"
 #include "common/util/strConverter.hpp" // for utf8_to_utf16
 #include "VertexShaderSource.h"
+#include "FixedFunctionVertexShaderState.cpp"
 
 #include <assert.h>
 #include <process.h>
@@ -839,6 +840,7 @@ typedef struct {
 typedef std::unordered_map<resource_key_t, resource_info_t, resource_key_hash> resource_cache_t;
 resource_cache_t g_Cxbx_Cached_Direct3DResources;
 resource_cache_t g_Cxbx_Cached_PaletizedTextures;
+FixedFunctionVertexShaderState g_renderStateBlock = {};
 
 bool IsResourceAPixelContainer(XTL::DWORD XboxResource_Common)
 {
@@ -1930,6 +1932,10 @@ static LRESULT WINAPI EmuMsgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPar
             {
                 VertexBufferConverter.PrintStats();
             }
+			else if (wParam == VK_F2)
+			{
+				g_bUseFixedFunctionVertexShader = !g_bUseFixedFunctionVertexShader;
+			}
             else if (wParam == VK_F6)
             {
                 // For some unknown reason, F6 isn't handled in WndMain::WndProc
@@ -5977,6 +5983,12 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_SetTransform)
     }
     */
 
+	// Transpose row major to column major for HLSL
+	D3DXMATRIX hlslMatrix;
+	D3DXMatrixTranspose(&hlslMatrix, (D3DXMATRIX*)pMatrix);
+	// Save to vertex shader state
+	((D3DXMATRIX*)&g_renderStateBlock.Transforms)[State] = hlslMatrix;
+
     State = EmuXB2PC_D3DTS(State);
 
     HRESULT hRet = g_pD3DDevice->SetTransform(State, pMatrix);
@@ -6651,6 +6663,227 @@ void CxbxUpdateHostVertexShaderConstants()
 	CxbxUpdateHostViewPortOffsetAndScaleConstants();
 }
 
+class FakeD3DState {
+
+	D3DCOLORVALUE colorValue(float r, float g, float b, float a) {
+		auto value = D3DCOLORVALUE();
+		value.r = r;
+		value.g = g;
+		value.b = b;
+		value.a = a;
+		return value;
+	}
+
+	D3DVECTOR toVector(float x, float y, float z) {
+		auto value = D3DVECTOR();
+		value.x = x;
+		value.y = y;
+		value.z = z;
+		return value;
+	}
+
+public:
+	// Lighting
+	std::array<XTL::X_D3DLIGHT8, 4096> Lights;
+	// Keep track of the last 8 lights set
+	std::array<int, 8> EnabledLights;
+
+	FakeD3DState() {
+		// Define the default light
+		// When unset lights are enabled, they're set to the default light
+		auto defaultLight = XTL::X_D3DLIGHT8();
+		defaultLight.Type = D3DLIGHT_DIRECTIONAL;
+		defaultLight.Diffuse = colorValue(1, 1, 1, 0);
+		defaultLight.Specular = colorValue(0, 0, 0, 0);
+		defaultLight.Ambient = colorValue(0, 0, 0, 0);
+		defaultLight.Position = toVector(0, 0, 0);
+		defaultLight.Direction = toVector(0, 0, 1);
+		defaultLight.Range = 0;
+		defaultLight.Falloff = 0;
+		defaultLight.Attenuation0 = 0;
+		defaultLight.Attenuation1 = 0;
+		defaultLight.Attenuation2 = 0;
+		defaultLight.Theta = 0;
+		defaultLight.Phi = 0;
+
+		// We'll just preset every light to the default light
+		Lights.fill(defaultLight);
+		EnabledLights.fill(-1);
+	}
+
+	int EnableLight(int index, bool enable) {
+		// EnabledLights contains the index of the enabled light
+		// or -1 at the end representing free slots
+
+		// Check to see if the light is already enabled
+		// Disable it if so
+		for (size_t i = 0; i < EnabledLights.size(); i++) {
+			if (EnabledLights[i] == index) {
+				// If enabling do nothing
+				// if disabling, disable the light
+				if (!enable) {
+					// Disable this light and move to the end
+					EnabledLights[i] = -1;
+					if (i != EnabledLights.size() - 1) // make sure this isn't already the last element
+						std::rotate(std::begin(EnabledLights) + i, std::begin(EnabledLights) + i + 1, std::end(EnabledLights));
+				}
+				return -1;
+			}
+			// Enable light if a slot is free
+			if (enable && EnabledLights[i] == -1) {
+				EnabledLights[i] = index;
+				return i;
+			}
+		}
+
+		if (!enable) // we didn't disable anything
+			return -1;
+
+		// Replace the oldest element and move to end
+		EnabledLights[0] = index;
+		std::rotate(std::begin(EnabledLights), std::begin(EnabledLights) + 1, std::end(EnabledLights));
+		return 0;
+	}
+};
+
+FakeD3DState fakeD3DState = FakeD3DState();
+
+D3DXVECTOR4 toVector(D3DCOLOR color) {
+	D3DXVECTOR4 v;
+	// ARGB to XYZW
+	v.w = (color >> 24 & 0xFF) / 255.f;
+	v.x = (color >> 16 & 0xFF) / 255.f;
+	v.y = (color >> 8 & 0xFF) / 255.f;
+	v.z = (color >> 0 & 0xFF) / 255.f;
+	return v;
+}
+
+D3DXVECTOR4 toVector(D3DCOLORVALUE val) {
+	return D3DXVECTOR4(val.r, val.g, val.b, val.a);
+}
+
+void UpdateLightState(int enabledLightsIndex, D3DXVECTOR4* pLightAmbient, D3DXMATRIX viewTransform) {
+	auto d3dLightIndex = fakeD3DState.EnabledLights[enabledLightsIndex];
+	auto light = &g_renderStateBlock.Lights[enabledLightsIndex];
+
+	if (d3dLightIndex == -1) {
+		light->Type = 0; // Disable the light
+		return;
+	}
+
+	auto d3dLight = &fakeD3DState.Lights[d3dLightIndex];
+
+	// TODO replace D3DX
+	// Pre-transform light position to viewspace
+	D3DXVECTOR4 positionV;
+	D3DXVec3Transform(&positionV, (D3DXVECTOR3*)&d3dLight->Position, &viewTransform);
+	light->PositionV = (D3DXVECTOR3)positionV;
+
+	// Pre-transform light direction to viewspace and normalize
+	D3DXVECTOR4 directionV;
+	D3DXMATRIX viewTransform3x3;
+	D3DXMatrixIdentity(&viewTransform3x3);
+	for (int y = 0; y < 3; y++) {
+		for (int x = 0; x < 3; x++) {
+			viewTransform3x3.m[x][y] = viewTransform.m[x][y];
+		}
+	}
+
+	D3DXVec3Transform(&directionV, (D3DXVECTOR3*)&d3dLight->Direction, &viewTransform3x3);
+	D3DXVec3Normalize((D3DXVECTOR3*)&light->DirectionVN, (D3DXVECTOR3*)&directionV);
+
+	// Map D3D light to state struct
+	light->Type = (float)((int)d3dLight->Type);
+	light->Diffuse = toVector(d3dLight->Diffuse);
+	light->Specular = toVector(d3dLight->Specular);
+	light->Range = d3dLight->Range;
+	light->Falloff = d3dLight->Falloff;
+	light->Attenuation.x = d3dLight->Attenuation0;
+	light->Attenuation.y = d3dLight->Attenuation1;
+	light->Attenuation.z = d3dLight->Attenuation2;
+
+	pLightAmbient->x += d3dLight->Ambient.r;
+	pLightAmbient->y += d3dLight->Ambient.g;
+	pLightAmbient->z += d3dLight->Ambient.b;
+
+	auto cosHalfPhi = cos(d3dLight->Phi / 2);
+	light->CosHalfPhi = cosHalfPhi;
+	light->SpotIntensityDivisor = cos(d3dLight->Theta / 2) - cos(d3dLight->Phi / 2);
+}
+
+float AsFloat(uint32_t value) {
+	auto v = value;
+	return *(float*)&v;
+}
+
+// TODO move out of Direct3D9.cpp
+void CxbxUpdateFixedFunctionStateBlock()
+{
+	// Lighting
+	g_renderStateBlock.Modes.Lighting = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_LIGHTING);
+	g_renderStateBlock.Modes.TwoSidedLighting = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_TWOSIDEDLIGHTING);
+	g_renderStateBlock.Modes.SpecularEnable = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_SPECULARENABLE);
+	g_renderStateBlock.Modes.LocalViewer = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_LOCALVIEWER);
+	g_renderStateBlock.Modes.ColorVertex = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_COLORVERTEX);
+
+	D3DXVECTOR4 Ambient = toVector(XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_AMBIENT));
+	D3DXVECTOR4 BackAmbient = toVector(XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_BACKAMBIENT));
+
+	// Material sources
+	g_renderStateBlock.Modes.AmbientMaterialSource = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_AMBIENTMATERIALSOURCE);
+	g_renderStateBlock.Modes.DiffuseMaterialSource = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_DIFFUSEMATERIALSOURCE);
+	g_renderStateBlock.Modes.SpecularMaterialSource = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_SPECULARMATERIALSOURCE);
+	g_renderStateBlock.Modes.EmissiveMaterialSource = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_EMISSIVEMATERIALSOURCE);
+	g_renderStateBlock.Modes.BackAmbientMaterialSource = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_BACKAMBIENTMATERIALSOURCE);
+	g_renderStateBlock.Modes.BackDiffuseMaterialSource = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_BACKDIFFUSEMATERIALSOURCE);
+	g_renderStateBlock.Modes.BackSpecularMaterialSource = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_BACKSPECULARMATERIALSOURCE);
+	g_renderStateBlock.Modes.BackEmissiveMaterialSource = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_BACKEMISSIVEMATERIALSOURCE);
+
+	// Point sprites
+	auto pointSize = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_POINTSIZE);
+	g_renderStateBlock.PointSprite.PointSize = *reinterpret_cast<float*>(&pointSize);
+	g_renderStateBlock.PointSprite.PointScaleEnable = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_POINTSCALEENABLE);
+	g_renderStateBlock.PointSprite.RenderTargetHeight = GetPixelContainerHeight(g_pXbox_RenderTarget);
+	auto scaleA = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_POINTSCALE_A);
+	g_renderStateBlock.PointSprite.ScaleA = *reinterpret_cast<float*>(&scaleA);
+	auto scaleB = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_POINTSCALE_B);
+	g_renderStateBlock.PointSprite.ScaleB = *reinterpret_cast<float*>(&scaleB);
+	auto scaleC = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_POINTSCALE_C);
+	g_renderStateBlock.PointSprite.ScaleC = *reinterpret_cast<float*>(&scaleC);
+
+	// Fog
+	g_renderStateBlock.Fog.RangeFogEnable = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_RANGEFOGENABLE);
+
+	// Texture state
+	for (int i = 0; i < 4; i++) {
+		auto transformFlags = XboxTextureStates.Get(i, XTL::X_D3DTSS_TEXTURETRANSFORMFLAGS);
+		g_renderStateBlock.TextureStates[i].TextureTransformFlagsCount = (float)(transformFlags & ~D3DTTFF_PROJECTED);
+		g_renderStateBlock.TextureStates[i].TextureTransformFlagsProjected = (float)(transformFlags & D3DTTFF_PROJECTED);
+
+		auto texCoordIndex = XboxTextureStates.Get(i, XTL::X_D3DTSS_TEXCOORDINDEX);
+		g_renderStateBlock.TextureStates[i].TexCoordIndex = (float)(texCoordIndex & 0x7); // 8 coords
+		g_renderStateBlock.TextureStates[i].TexCoordIndexGen = (float)(texCoordIndex >> 16); // D3DTSS_TCI flags
+	}
+
+	// Misc flags
+	g_renderStateBlock.Modes.VertexBlend = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_VERTEXBLEND);
+	g_renderStateBlock.Modes.NormalizeNormals = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_NORMALIZENORMALS);
+
+	auto LightAmbient = D3DXVECTOR4(0.f, 0.f, 0.f, 0.f);
+	D3DXMATRIX rowMajorViewTransform;
+	D3DXMatrixTranspose(&rowMajorViewTransform, (D3DXMATRIX*)&g_renderStateBlock.Transforms.View);
+	for (size_t i = 0; i < g_renderStateBlock.Lights.size(); i++) {
+		UpdateLightState(i, &LightAmbient, rowMajorViewTransform);
+	}
+
+	g_renderStateBlock.AmbientPlusLightAmbient = Ambient + LightAmbient;
+	g_renderStateBlock.BackAmbientPlusLightAmbient = BackAmbient + LightAmbient;
+
+	const int slotSize = 16;
+	const int fixedFunctionStateSize = (sizeof(FixedFunctionVertexShaderState) + slotSize - 1) / slotSize;
+	auto hRet = g_pD3DDevice->SetVertexShaderConstantF(0, (float*)&g_renderStateBlock, fixedFunctionStateSize);
+}
+
 extern void CxbxUpdateHostVertexDeclaration(); // TMP glue
 extern void CxbxUpdateHostVertexShader(); // TMP glue
 
@@ -6664,6 +6897,10 @@ void CxbxUpdateNativeD3DResources()
 	CxbxUpdateHostVertexShader();
 
 	CxbxUpdateHostVertexShaderConstants();
+
+	if (g_Xbox_VertexShader_IsFixedFunction) {
+		CxbxUpdateFixedFunctionStateBlock();
+	}
 
 	// NOTE: Order is important here
     // Some Texture States depend on RenderState values (Point Sprites)
@@ -7218,6 +7455,8 @@ HRESULT WINAPI XTL::EMUPATCH(D3DDevice_SetLight)
 
 	XB_TRMP(D3DDevice_SetLight)(Index, pLight);
 
+	fakeD3DState.Lights[Index] = *pLight;
+
     HRESULT hRet = g_pD3DDevice->SetLight(Index, pLight);
 	DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetLight");    
 
@@ -7233,6 +7472,12 @@ VOID WINAPI XTL::EMUPATCH(D3DDevice_SetMaterial)
 )
 {
 	LOG_FUNC_ONE_ARG(pMaterial);
+
+	g_renderStateBlock.Materials[0].Ambient = toVector(pMaterial->Ambient);
+	g_renderStateBlock.Materials[0].Diffuse = toVector(pMaterial->Diffuse);
+	g_renderStateBlock.Materials[0].Specular = toVector(pMaterial->Specular);
+	g_renderStateBlock.Materials[0].Emissive = toVector(pMaterial->Emissive);
+	g_renderStateBlock.Materials[0].Power = pMaterial->Power;
 
     HRESULT hRet = g_pD3DDevice->SetMaterial(pMaterial);
 	DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetMaterial");
@@ -7253,6 +7498,8 @@ HRESULT WINAPI XTL::EMUPATCH(D3DDevice_LightEnable)
 		LOG_FUNC_END;
 
 	XB_TRMP(D3DDevice_LightEnable)(Index, bEnable);
+
+	auto enabledLightIndex = fakeD3DState.EnableLight(Index, bEnable);
 
     HRESULT hRet = g_pD3DDevice->LightEnable(Index, bEnable);
 	DEBUG_D3DRESULT(hRet, "g_pD3DDevice->LightEnable");    
