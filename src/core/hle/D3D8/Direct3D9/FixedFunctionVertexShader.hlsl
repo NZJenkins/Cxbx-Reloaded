@@ -3,6 +3,7 @@
 // Default values for vertex registers, and whether to use them
 uniform float4 vRegisterDefaultValues[16] : register(c192);
 uniform float4 vRegisterDefaultFlagsPacked[4] : register(c208);
+static  bool  vRegisterDefaultFlags[16];
 uniform float4 xboxTextureScale[4] : register(c214);
 
 uniform FixedFunctionVertexShaderState state : register(c0);
@@ -333,7 +334,7 @@ TransformInfo DoWorldTransform(const float4 position, const float3 normal, const
     return output;
 }
 
-Material DoMaterial(const uint index, const float4 color0, const float4 color1)
+Material DoMaterial(const uint index, const uint diffuseReg, const uint specularReg, const VS_INPUT xIn)
 {
     // Get the material from material state
     Material material = state.Materials[index];
@@ -345,33 +346,25 @@ Material DoMaterial(const uint index, const float4 color0, const float4 color1)
         const int D3DMCS_COLOR1 = 1;
         const int D3DMCS_COLOR2 = 2;
 
-        // TODO verify correct behaviour when COLORVERTEX is true but no vertex colours are provided
-        // Do we use the material value like D3D9? Or the default colour value (which you can set on Xbox)
-        // In D3D9 "If either AMBIENTMATERIALSOURCE option is used, and the vertex color is not provided, then the material ambient color is used."
-        
-        // Ambient
-        if (state.Modes.AmbientMaterialSource == D3DMCS_COLOR1)
-            material.Ambient = color0;
-        else if (state.Modes.AmbientMaterialSource == D3DMCS_COLOR2)
-            material.Ambient = color1;
+        // TODO preprocess on the CPU
+        // If COLORVERTEX mode, AND the desired diffuse or specular colour is defined in the vertex declaration
+        // Then use the vertex colour instead of the material
 
-        // Diffuse
-        if (state.Modes.DiffuseMaterialSource == D3DMCS_COLOR1)
-            material.Diffuse = color0;
-        else if (state.Modes.DiffuseMaterialSource == D3DMCS_COLOR2)
-            material.Diffuse = color1;
+        if (!vRegisterDefaultFlags[diffuseReg]) {
+            float4 diffuseVertexColour = Get(xIn, diffuseReg);
+            if (state.Modes.AmbientMaterialSource == D3DMCS_COLOR1) material.Ambient = diffuseVertexColour;
+            if (state.Modes.DiffuseMaterialSource == D3DMCS_COLOR1) material.Diffuse = diffuseVertexColour;
+            if (state.Modes.SpecularMaterialSource == D3DMCS_COLOR1) material.Specular = diffuseVertexColour;
+            if (state.Modes.EmissiveMaterialSource == D3DMCS_COLOR1) material.Emissive = diffuseVertexColour;
+        }
 
-        // Specular
-        if (state.Modes.SpecularMaterialSource == D3DMCS_COLOR1)
-            material.Specular = color0;
-        else if (state.Modes.SpecularMaterialSource == D3DMCS_COLOR2)
-            material.Specular = color1;
-
-        // Emissive
-        if (state.Modes.EmissiveMaterialSource == D3DMCS_COLOR1)
-            material.Emissive = color0;
-        else if (state.Modes.EmissiveMaterialSource == D3DMCS_COLOR2)
-            material.Emissive = color1;
+        if (!vRegisterDefaultFlags[specularReg]) {
+			float4 specularVertexColour = Get(xIn, specularReg);
+            if (state.Modes.AmbientMaterialSource == D3DMCS_COLOR2) material.Ambient = specularVertexColour;
+            if (state.Modes.DiffuseMaterialSource == D3DMCS_COLOR2) material.Diffuse = specularVertexColour;
+            if (state.Modes.SpecularMaterialSource == D3DMCS_COLOR2) material.Specular = specularVertexColour;
+            if (state.Modes.EmissiveMaterialSource == D3DMCS_COLOR2) material.Emissive = specularVertexColour;
+        }
     }
 
     return material;
@@ -466,9 +459,6 @@ VS_INPUT DoGetInputRegisterOverrides(const VS_INPUT xInput)
 {
     VS_INPUT xIn;
 
-	// Unpack 16 flags from 4 float4 constant registers
-    float vRegisterDefaultFlags[16] = (float[16]) vRegisterDefaultFlagsPacked;
-
     // Initialize input registers from the vertex buffer data
     // Or use the register's default value (which can be changed by the title)
     for (uint i = 0; i < 16; i++) {
@@ -500,6 +490,9 @@ VS_OUTPUT main(const VS_INPUT xInput)
 {
     VS_OUTPUT xOut;
 
+    // Unpack 16 bool flags from 4 float4 constant registers
+	vRegisterDefaultFlags = (bool[16]) vRegisterDefaultFlagsPacked;
+
     // TODO make sure this goes fast
     // TODO translate FVFs to vertex declarations
     // TODO make sure register default flags are actually set properly
@@ -528,8 +521,8 @@ VS_OUTPUT main(const VS_INPUT xInput)
     if (state.Modes.Lighting || state.Modes.TwoSidedLighting)
     {
         // Materials
-        Material material = DoMaterial(0, Get(xIn, diffuse), Get(xIn, specular));
-        Material backMaterial = DoMaterial(1, Get(xIn, backDiffuse), Get(xIn, backSpecular));
+        Material material = DoMaterial(0, diffuse, specular, xIn);
+        Material backMaterial = DoMaterial(1, backDiffuse, backSpecular, xIn);
         
         float2 powers = float2(material.Power, backMaterial.Power);
 
