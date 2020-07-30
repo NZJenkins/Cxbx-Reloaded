@@ -551,17 +551,16 @@ VS_OUTPUT main(const VS_INPUT xInput)
 
     // TODO verify if TwoSidedLighting can be enabled independently of Lighting
     // Diffuse and specular for when lighting is disabled
-    // Use default values. Materials aren't used
     if (!state.Modes.Lighting)
     {
-        xOut.oD0 = state.Modes.ColorVertex ? Get(xIn, diffuse) : float4(1, 1, 1, 1);
-        xOut.oD1 = state.Modes.ColorVertex ? Get(xIn, specular) : float4(0, 0, 0, 0);
+        xOut.oD0 = Get(xIn, diffuse);
+        xOut.oD1 = Get(xIn, specular);
     }
 
     if(!state.Modes.TwoSidedLighting)
     {
-        xOut.oB0 = state.Modes.ColorVertex ? Get(xIn, backDiffuse) : float4(1, 1, 1, 1);
-        xOut.oB1 = state.Modes.ColorVertex ? Get(xIn, backSpecular) : float4(0, 0, 0, 0);
+        xOut.oB0 = Get(xIn, backDiffuse);
+        xOut.oB1 = Get(xIn, backSpecular);
     }
 
     xOut.oD0 = saturate(xOut.oD0);
