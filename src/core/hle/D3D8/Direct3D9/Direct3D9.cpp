@@ -6762,7 +6762,7 @@ D3DXVECTOR4 toVector(D3DCOLORVALUE val) {
 	return D3DXVECTOR4(val.r, val.g, val.b, val.a);
 }
 
-void UpdateLightState(int enabledLightsIndex, D3DXVECTOR4* pLightAmbient, D3DMATRIX viewTransform) {
+void UpdateLightState(int enabledLightsIndex, D3DXVECTOR4* pLightAmbient, D3DXMATRIX viewTransform) {
 	auto d3dLightIndex = fakeD3DState.EnabledLights[enabledLightsIndex];
 	auto light = &g_renderStateBlock.Lights[enabledLightsIndex];
 
@@ -6776,12 +6776,20 @@ void UpdateLightState(int enabledLightsIndex, D3DXVECTOR4* pLightAmbient, D3DMAT
 	// TODO replace D3DX
 	// Pre-transform light position to viewspace
 	D3DXVECTOR4 positionV;
-	D3DXVec3Transform(&positionV, (D3DXVECTOR3*)&d3dLight->Position, (D3DXMATRIX*)&viewTransform);
+	D3DXVec3Transform(&positionV, (D3DXVECTOR3*)&d3dLight->Position, &viewTransform);
 	light->PositionV = (D3DXVECTOR3)positionV;
 
 	// Pre-transform light direction to viewspace and normalize
 	D3DXVECTOR4 directionV;
-	D3DXVec3Transform(&directionV, (D3DXVECTOR3*)&d3dLight->Direction, (D3DXMATRIX*)&viewTransform);
+	D3DXMATRIX viewTransform3x3;
+	D3DXMatrixIdentity(&viewTransform3x3);
+	for (int y = 0; y < 3; y++) {
+		for (int x = 0; x < 3; x++) {
+			viewTransform3x3.m[x][y] = viewTransform.m[x][y];
+		}
+	}
+
+	D3DXVec3Transform(&directionV, (D3DXVECTOR3*)&d3dLight->Direction, &viewTransform3x3);
 	D3DXVec3Normalize((D3DXVECTOR3*)&light->DirectionVN, (D3DXVECTOR3*)&directionV);
 
 	// Map D3D light to state struct
@@ -6850,8 +6858,10 @@ void CxbxUpdateFixedFunctionStateBlock()
 	g_renderStateBlock.Modes.NormalizeNormals = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_NORMALIZENORMALS);
 
 	auto LightAmbient = D3DXVECTOR4(0.f, 0.f, 0.f, 0.f);
+	D3DXMATRIX rowMajorViewTransform;
+	D3DXMatrixTranspose(&rowMajorViewTransform, (D3DXMATRIX*)&g_renderStateBlock.Transforms.View);
 	for (size_t i = 0; i < g_renderStateBlock.Lights.size(); i++) {
-		UpdateLightState(i, &LightAmbient, g_renderStateBlock.Transforms.View);
+		UpdateLightState(i, &LightAmbient, rowMajorViewTransform);
 	}
 
 	g_renderStateBlock.AmbientPlusLightAmbient = Ambient + LightAmbient;
