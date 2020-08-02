@@ -210,18 +210,8 @@ set_source_files_properties(
   PROPERTIES HEADER_FILE_ONLY TRUE
 )
 
-# TODO this doesn't run when files are changed
-# Copy the fixed function shader files to a directory
-# As it's too large to #include as a string
-add_custom_command(TARGET cxbx POST_BUILD 
- COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:cxbxr-emu>/hlsl)
-add_custom_command(TARGET cxbx POST_BUILD
- COMMAND ${CMAKE_COMMAND} -E copy_if_different 
- "${CXBXR_ROOT_DIR}/src/core/hle/D3D8/Direct3D9/FixedFunctionVertexShader.hlsl"
- $<TARGET_FILE_DIR:cxbxr-emu>/hlsl
-)
-add_custom_command(TARGET cxbx POST_BUILD
- COMMAND ${CMAKE_COMMAND} -E copy_if_different
- "${CXBXR_ROOT_DIR}/src/core/hle/D3D8/Direct3D9/FixedFunctionVertexShaderState.cpp"
- $<TARGET_FILE_DIR:cxbxr-emu>/hlsl
+add_custom_target(copy_hlsl ALL
+ COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:cxbx>/hlsl
+ COMMAND ${CMAKE_COMMAND} -E copy "${CXBXR_ROOT_DIR}/src/core/hle/D3D8/Direct3D9/FixedFunctionVertexShaderState.cpp" $<TARGET_FILE_DIR:cxbx>/hlsl
+ COMMAND ${CMAKE_COMMAND} -E copy "${CXBXR_ROOT_DIR}/src/core/hle/D3D8/Direct3D9/FixedFunctionVertexShader.hlsl" $<TARGET_FILE_DIR:cxbx>/hlsl
 )
