@@ -181,12 +181,13 @@ LightingOutput DoSpotLight(const Light l, const float3 toViewerVN, const float2 
     o.Specular.Front = o.Specular.Back = float3(0, 0, 0);
 
     // Diffuse
-    float3 toVertexV = View.Position.xyz - l.PositionV;
-    float3 toVertexVN = normalize(toVertexV);
-    float lightDist = length(toVertexV);
+	float3 toLightV = l.PositionV - View.Position.xyz;
+	float lightDist = length(toLightV);
+	float3 toLightVN = normalize(toLightV);
+	float3 toVertexVN = -toLightVN;
 
     // https://docs.microsoft.com/en-us/windows/win32/direct3d9/light-types
-    float cosAlpha = dot(l.DirectionVN, toVertexVN);
+	float cosAlpha = dot(l.DirectionVN, toVertexVN);
     // I = ( cos(a) - cos(phi/2) ) / ( cos(theta/2) - cos(phi/2) )
     float spotBase = saturate((cosAlpha - l.CosHalfPhi) / l.SpotIntensityDivisor);
     float spotIntensity = pow(spotBase, l.Falloff);
@@ -201,7 +202,7 @@ LightingOutput DoSpotLight(const Light l, const float3 toViewerVN, const float2 
     if (lightDist > l.Range)
         attenuation = 0;
 
-    float NdotL = dot(View.Normal, l.DirectionVN);
+    float NdotL = dot(View.Normal, toLightVN);
     float3 lightDiffuse = abs(NdotL) * attenuation * l.Diffuse.rgb * spotIntensity;
 
     if (NdotL >= 0)
@@ -210,7 +211,6 @@ LightingOutput DoSpotLight(const Light l, const float3 toViewerVN, const float2 
         o.Diffuse.Back = lightDiffuse;
 
     // Specular
-	float3 toLightVN = -toVertexVN;
     o.Specular = DoSpecular(toLightVN, toViewerVN, powers, l.Specular);
     o.Specular.Front *= attenuation;
     o.Specular.Back *= attenuation;
