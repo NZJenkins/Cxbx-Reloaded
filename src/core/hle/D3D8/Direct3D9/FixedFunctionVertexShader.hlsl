@@ -421,7 +421,7 @@ float4 DoTexCoord(const uint stage, const VS_INPUT xIn)
 		float3 reflected = reflect(normalize(View.Position.xyz), View.Normal);
         
 		if (tState.TexCoordIndexGen == TCI_CAMERASPACENORMAL)
-			texCoord.xyz = View.Normal;
+			texCoord = float4(View.Normal, 1);
 		else if (tState.TexCoordIndexGen == TCI_CAMERASPACEPOSITION)
 			texCoord = View.Position;
 		else if (tState.TexCoordIndexGen == TCI_CAMERASPACEREFLECTIONVECTOR)
