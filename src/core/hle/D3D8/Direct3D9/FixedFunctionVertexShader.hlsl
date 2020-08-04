@@ -415,35 +415,32 @@ float4 DoTexCoord(const uint stage, const VS_INPUT xIn)
         uint texCoordIndex = abs(tState.TexCoordIndex); // Note : abs() avoids error X3548 : in vs_3_0 uints can only be used with known - positive values, use int if possible
         texCoord = Get(xIn, texcoord0+texCoordIndex);
     }
-    else
-    {   
+	else
+	{
         // Generate texture coordinates
-        float3 reflected = reflect(normalize(View.Position.xyz), View.Normal);
+		float3 reflected = reflect(normalize(View.Position.xyz), View.Normal);
         
-        if (tState.TexCoordIndexGen == TCI_CAMERASPACENORMAL)
-            texCoord.xyz = View.Normal;
-        else if (tState.TexCoordIndexGen == TCI_CAMERASPACEPOSITION)
-            texCoord = View.Position;
-        else if (tState.TexCoordIndexGen == TCI_CAMERASPACEREFLECTIONVECTOR)
-            texCoord.xyz = reflected;
+		if (tState.TexCoordIndexGen == TCI_CAMERASPACENORMAL)
+			texCoord.xyz = View.Normal;
+		else if (tState.TexCoordIndexGen == TCI_CAMERASPACEPOSITION)
+			texCoord = View.Position;
+		else if (tState.TexCoordIndexGen == TCI_CAMERASPACEREFLECTIONVECTOR)
+			texCoord.xyz = reflected;
         // else if TCI_OBJECT TODO is this just model position?
-        else if (tState.TexCoordIndexGen == TCI_SPHERE)
-        {
+		else if (tState.TexCoordIndexGen == TCI_SPHERE)
+		{
             // TODO verify
             // http://www.bluevoid.com/opengl/sig99/advanced99/notes/node177.html
-            float3 R = reflected;
-            float p = sqrt(pow(R.x, 2) + pow(R.y, 2) + pow(R.z + 1, 2));
-            texCoord.x = R.x / 2 * p + 0.5f;
-            texCoord.y = R.y / 2 * p + 0.5f;
-        }
-    }
+			float3 R = reflected;
+			float p = sqrt(pow(R.x, 2) + pow(R.y, 2) + pow(R.z + 1, 2));
+			texCoord.x = R.x / 2 * p + 0.5f;
+			texCoord.y = R.y / 2 * p + 0.5f;
+		}
+	}
 
-    // Determine if we need to transform the texture coordinates
-    if (countFlag == D3DTTFF_DISABLE)
-        return texCoord; // No transforms, just return it
-
-    // Transform the coordinates
-    float4 transformedCoords = mul(texCoord, state.Transforms.Texture[stage]);
+    // Transform the texture coordinates if requested
+    if (countFlag != D3DTTFF_DISABLE)
+		texCoord = mul(texCoord, state.Transforms.Texture[stage]);
 
     // We always send four coordinates
     // If we are supposed to send less than four
@@ -451,13 +448,13 @@ float4 DoTexCoord(const uint stage, const VS_INPUT xIn)
     // For D3DTTFF_PROJECTED, the value of the *last* component is important
     // Fixes the ProjectedTexture sample, which uses 3 coordinates
 	if (countFlag == 1)
-		transformedCoords.yzw = transformedCoords.x;
+		texCoord.yzw = texCoord.x;
 	else if (countFlag == 2)
-		transformedCoords.zw = transformedCoords.y;
+		texCoord.zw = texCoord.y;
 	else if (countFlag == 3)
-		transformedCoords.w = transformedCoords.z;
+		texCoord.w = texCoord.z;
     
-	return transformedCoords;
+	return texCoord;
 }
 
 VS_INPUT DoGetInputRegisterOverrides(const VS_INPUT xInput)
