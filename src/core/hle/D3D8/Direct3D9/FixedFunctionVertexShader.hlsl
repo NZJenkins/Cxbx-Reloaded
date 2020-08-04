@@ -444,15 +444,20 @@ float4 DoTexCoord(const uint stage, const VS_INPUT xIn)
 
     // Transform the coordinates
     float4 transformedCoords = mul(texCoord, state.Transforms.Texture[stage]);
-    
-    if (projected)
-    {
-        // Projected coordinates are divided by the last coordinate index
-        int lastCoordIndex = countFlag - 1;
-        transformedCoords /= transformedCoords[lastCoordIndex];
-    }
 
-    return transformedCoords;
+    // We always send four coordinates
+    // If we are supposed to send less than four
+    // then copy the last coordinate to the remaining components
+    // For D3DTTFF_PROJECTED, the value of the *last* component is important
+    // Fixes the ProjectedTexture sample, which uses 3 coordinates
+	if (countFlag == 1)
+		transformedCoords.yzw = transformedCoords.x;
+	else if (countFlag == 2)
+		transformedCoords.zw = transformedCoords.y;
+	else if (countFlag == 3)
+		transformedCoords.w = transformedCoords.z;
+    
+	return transformedCoords;
 }
 
 VS_INPUT DoGetInputRegisterOverrides(const VS_INPUT xInput)
