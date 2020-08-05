@@ -958,12 +958,13 @@ public:
 					RegVIsPresentInDeclaration[regIndex] = true;
 					// Remember a pointer to this register
 					HostVertexElementPerRegister[regIndex] = pCurrentHostVertexElement;
-					pCurrentHostVertexElement++;
 
 					EmuLog(LOG_LEVEL::DEBUG, "\tXbox Stream %d, Offset %d, Format %d, Slot %d",
 						slot.StreamIndex, slot.Offset, slot.Format, regIndex);
 					EmuLog(LOG_LEVEL::DEBUG, "\tHost Stream %d, Offset %d, Format %d, Usage %d-%d",
 						pCurrentHostVertexElement->Stream, pCurrentHostVertexElement->Offset, pCurrentHostVertexElement->Type, pCurrentHostVertexElement->Usage, pCurrentHostVertexElement->UsageIndex);
+
+					pCurrentHostVertexElement++;
 				}
 			}
 		}
