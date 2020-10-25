@@ -88,6 +88,15 @@ struct Modes {
     alignas(16) float NormalizeNormals;
 };
 
+struct PointSprite {
+    alignas(16) float PointSize;
+    alignas(16) float PointScaleEnable;
+    alignas(16) float RenderTargetHeight;
+    alignas(16) float ScaleA;
+    alignas(16) float ScaleB;
+    alignas(16) float ScaleC;
+};
+
 struct TextureState {
     alignas(16) float TextureTransformFlagsCount;
     alignas(16) float TextureTransformFlagsProjected;
@@ -108,6 +117,7 @@ struct FixedFunctionVertexShaderState {
     alignas(16) Modes Modes;
     alignas(16) Fog Fog;
     alignas(16) arr(TextureStates, TextureState, 4);
+    alignas(16) PointSprite PointSprite;
 };
 
 #ifdef  __cplusplus

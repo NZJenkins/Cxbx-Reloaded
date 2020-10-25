@@ -457,6 +457,22 @@ float4 DoTexCoord(const uint stage, const VS_INPUT xIn)
 	return texCoord;
 }
 
+// Point size for Point Sprites
+// https://docs.microsoft.com/en-us/windows/win32/direct3d9/point-sprites
+float DoPointSpriteSize()
+{
+    PointSprite ps = state.PointSprite;
+    float pointSize = ps.PointSize;
+    if (ps.PointScaleEnable)
+    {
+        float eyeDistance = length(View.Position);
+        float factor = ps.ScaleA + ps.ScaleB * eyeDistance + ps.ScaleC * (eyeDistance * eyeDistance);
+        pointSize *= ps.RenderTargetHeight * sqrt(1 / factor);
+    }
+
+    return pointSize;
+}
+
 VS_INPUT DoGetInputRegisterOverrides(const VS_INPUT xInput)
 {
     VS_INPUT xIn;
@@ -573,9 +589,7 @@ VS_OUTPUT main(const VS_INPUT xInput)
     float fog = DoFog();
     xOut.oFog = fog;
 
-    // TODO Point size for Point Sprites
-    // https://docs.microsoft.com/en-us/windows/win32/direct3d9/point-sprites
-	xOut.oPts = 0;
+    xOut.oPts = DoPointSpriteSize();
 
     // xOut.oD0 = float4(world.Normal, 1);
 

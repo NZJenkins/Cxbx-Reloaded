@@ -6839,6 +6839,18 @@ void CxbxUpdateFixedFunctionStateBlock()
 	g_renderStateBlock.Modes.BackSpecularMaterialSource = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_BACKSPECULARMATERIALSOURCE);
 	g_renderStateBlock.Modes.BackEmissiveMaterialSource = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_BACKEMISSIVEMATERIALSOURCE);
 
+	// Point sprites
+	auto pointSize = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_POINTSIZE);
+	g_renderStateBlock.PointSprite.PointSize = *reinterpret_cast<float*>(&pointSize);
+	g_renderStateBlock.PointSprite.PointScaleEnable = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_POINTSCALEENABLE);
+	g_renderStateBlock.PointSprite.RenderTargetHeight = GetPixelContainerHeight(g_pXbox_RenderTarget);
+	auto scaleA = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_POINTSCALE_A);
+	g_renderStateBlock.PointSprite.ScaleA = *reinterpret_cast<float*>(&scaleA);
+	auto scaleB = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_POINTSCALE_B);
+	g_renderStateBlock.PointSprite.ScaleB = *reinterpret_cast<float*>(&scaleB);
+	auto scaleC = XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_POINTSCALE_C);
+	g_renderStateBlock.PointSprite.ScaleC = *reinterpret_cast<float*>(&scaleC);
+
 	// Fog
 	g_renderStateBlock.Fog.RangeFogEnable = (float)XboxRenderStates.GetXboxRenderState(XTL::X_D3DRS_RANGEFOGENABLE);
 
