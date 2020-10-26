@@ -1397,6 +1397,26 @@ xbox::X_VERTEXATTRIBUTEFORMAT CxbxFVFToXboxVertexAttributeFormat(DWORD xboxFvf)
 	return declaration;
 }
 
+// HACK: Set FVFs through this method
+// and determine the declared registers
+// This isn't very clean - we should unify handling of FVF and vertex declarations
+HRESULT SetFvf(DWORD xboxFvf) {
+
+	HRESULT hRet = g_pD3DDevice->SetFVF(xboxFvf);
+
+	// Ensure HLSL shaders know which vertex registers are in use
+	auto vertexAttr = CxbxFVFToXboxVertexAttributeFormat(xboxFvf);
+	// FIXME remove copy-pasted code
+	// unify with SetCxbxVertexDeclaration
+	float vertexDefaultFlags[X_VSH_MAX_ATTRIBUTES];
+	for (int i = 0; i < X_VSH_MAX_ATTRIBUTES; i++) {
+		vertexDefaultFlags[i] = vertexAttr.Slots[i].Format > 0 ? 0.0f : 1.0f;
+	}
+	g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_CONSTREG_VREGDEFAULTS_FLAG_BASE, vertexDefaultFlags, 4);
+
+	return hRet;
+}
+
 void SetCxbxVertexDeclaration(CxbxVertexDeclaration& pCxbxVertexDeclaration) {
 	LOG_INIT
 
@@ -1593,7 +1613,7 @@ void CxbxImpl_SetVertexShader(DWORD Handle)
 	else {
 		hRet = g_pD3DDevice->SetVertexShader(nullptr);
 		DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetVertexShader");
-		hRet = g_pD3DDevice->SetFVF(Handle);
+		hRet = SetFvf(Handle);
 		DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetFVF");
 	}
 }
