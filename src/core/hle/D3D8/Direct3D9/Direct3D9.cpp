@@ -7272,6 +7272,16 @@ void CxbxUpdateNativeD3DResources()
 
 	// Update fixed function vertex shader state
 	if (g_Xbox_VertexShaderMode == VertexShaderMode::FixedFunction && g_UseFixedFunctionVertexShader) {
+
+		// Initialize default vertex attribute registers (for hlsl fixed function use)
+		// Test case: Mechassault (skybox)
+		const float white[4] = { 1, 1, 1, 1 };
+		const float black[4] = { 0, 0, 0, 0 };
+		g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_CONSTREG_VREGDEFAULTS_BASE + xbox::X_D3DVSDE_DIFFUSE, white, 1);
+		g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_CONSTREG_VREGDEFAULTS_BASE + xbox::X_D3DVSDE_BACKDIFFUSE, white, 1);
+		g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_CONSTREG_VREGDEFAULTS_BASE + xbox::X_D3DVSDE_SPECULAR, black, 1);
+		g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_CONSTREG_VREGDEFAULTS_BASE + xbox::X_D3DVSDE_BACKSPECULAR, black, 1);
+
 		UpdateFixedFunctionVertexShaderState();
 	}
 
