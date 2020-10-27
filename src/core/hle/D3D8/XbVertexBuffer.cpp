@@ -1028,7 +1028,7 @@ void EmuFlushIVB()
 	HRESULT hRet;
 
 	if (bFVF) {
-		g_pD3DDevice->SetVertexShader(nullptr);
+		SetVertexShader(nullptr);
 		hRet = SetFvf(dwCurFVF);
 		//DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetVertexShader");
 	}

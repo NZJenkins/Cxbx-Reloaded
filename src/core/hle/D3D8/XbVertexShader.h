@@ -107,6 +107,18 @@ extern D3DVERTEXELEMENT *EmuRecompileVshDeclaration
     CxbxVertexDeclaration *pCxbxVertexDeclaration
 );
 
+enum class VertexShaderMode {
+	FixedFunction,
+	// TODO implement the FixedFunction vs. Passthrough distinction
+	// When titles use Xbox fixed function with pre-transformed vertices
+	// it actually uses a special "passthrough" shader program
+	// Passthrough,
+	ShaderProgram
+};
+
+extern VertexShaderMode g_Xbox_VertexShaderMode;
+extern bool g_UseFixedFunctionVertexShader;
+
 // Intermediate vertex shader structures
 
 enum VSH_OREG_NAME {
@@ -245,5 +257,6 @@ extern void CxbxImpl_SetVertexShaderConstant(INT Register, PVOID pConstantData, 
 extern HRESULT CxbxImpl_CreateVertexShader(CONST DWORD *pDeclaration, CONST DWORD *pFunction, DWORD *pHandle, DWORD Usage);
 extern void CxbxImpl_DeleteVertexShader(DWORD Handle);
 extern HRESULT SetFvf(DWORD xboxFvf);
+extern HRESULT SetVertexShader(IDirect3DVertexShader* pShader);
 
 #endif

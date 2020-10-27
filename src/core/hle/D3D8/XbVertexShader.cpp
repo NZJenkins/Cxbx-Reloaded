@@ -337,6 +337,9 @@ public:
 
 extern D3DCAPS g_D3DCaps;
 
+VertexShaderMode g_Xbox_VertexShaderMode = VertexShaderMode::FixedFunction;
+bool g_UseFixedFunctionVertexShader = true;
+
 class XboxVertexDeclarationConverter
 {
 protected:
@@ -1417,6 +1420,42 @@ HRESULT SetFvf(DWORD xboxFvf) {
 	return hRet;
 }
 
+// HACK: Set vertex shaders through this method
+// And use that to determine what shader mode we're in
+// We should be keeping track of the shader mode regardless!
+HRESULT SetVertexShader(IDirect3DVertexShader* pShader) {
+	LOG_INIT
+
+	static IDirect3DVertexShader* pFixedFunctionShader = nullptr;
+
+	HRESULT hRet;
+
+	if (pShader == nullptr) {
+		// TODO the current FVF might imply passthrough mode!
+		g_Xbox_VertexShaderMode = VertexShaderMode::FixedFunction;
+
+		// Create fixed function shader if necessary
+		if (g_UseFixedFunctionVertexShader && !pFixedFunctionShader) {
+			ID3DBlob* pCompiledShader;
+			EmuCompileFixedFunction(&pCompiledShader);
+			auto hRet = g_pD3DDevice->CreateVertexShader((DWORD*)pCompiledShader->GetBufferPointer(), &pFixedFunctionShader);
+
+			if (hRet != D3D_OK)
+				CxbxKrnlCleanup("Setting fixed function shader failed");
+		}
+
+		// Toggle fixed function implementation (shader vs D3D9)
+		if (g_UseFixedFunctionVertexShader)
+			pShader = pFixedFunctionShader;
+	}
+	else {
+		g_Xbox_VertexShaderMode = VertexShaderMode::ShaderProgram;
+	}
+
+	hRet = g_pD3DDevice->SetVertexShader(pShader);
+	DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetVertexShader");
+}
+
 void SetCxbxVertexDeclaration(CxbxVertexDeclaration& pCxbxVertexDeclaration) {
 	LOG_INIT
 
@@ -1439,22 +1478,17 @@ void SetCxbxVertexDeclaration(CxbxVertexDeclaration& pCxbxVertexDeclaration) {
 // TODO Call this when state is dirty in UpdateNativeD3DResources
 // Rather than every time state changes
 void SetVertexShaderFromSlots() {
-	LOG_INIT
-
 	auto pTokens = GetCxbxVertexShaderSlotPtr(g_CxbxVertexShaderSlotAddress);
 	if (pTokens) {
 		// Create a vertex shader from the tokens
 		DWORD shaderSize;
 		auto shaderKey = g_VertexShaderSource.CreateShader(pTokens, &shaderSize);
-		HRESULT hRet = g_pD3DDevice->SetVertexShader(g_VertexShaderSource.GetShader(shaderKey));
-		DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetVertexShader");
+		HRESULT hRet = SetVertexShader(g_VertexShaderSource.GetShader(shaderKey));
 	}
 }
 
 void SetCxbxVertexShaderHandle(CxbxVertexShader* pCxbxVertexShader)
 {
-	LOG_INIT
-
 	HRESULT hRet;
 
 	// Get vertex shader if we have a key
@@ -1463,8 +1497,7 @@ void SetCxbxVertexShaderHandle(CxbxVertexShader* pCxbxVertexShader)
 		: nullptr;
 
 	// Set vertex shader
-	hRet = g_pD3DDevice->SetVertexShader(pHostShader);
-	DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetVertexShader");
+	hRet = SetVertexShader(pHostShader);
 
 	SetCxbxVertexDeclaration(pCxbxVertexShader->Declaration);
 }
@@ -1611,8 +1644,7 @@ void CxbxImpl_SetVertexShader(DWORD Handle)
 		}
 	}
 	else {
-		hRet = g_pD3DDevice->SetVertexShader(nullptr);
-		DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetVertexShader");
+		hRet = SetVertexShader(nullptr);
 		hRet = SetFvf(Handle);
 		DEBUG_D3DRESULT(hRet, "g_pD3DDevice->SetFVF");
 	}

@@ -1956,6 +1956,10 @@ static LRESULT WINAPI EmuMsgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPar
             {
                 VertexBufferConverter.PrintStats();
             }
+			else if (wParam == VK_F2)
+			{
+				g_UseFixedFunctionVertexShader = !g_UseFixedFunctionVertexShader;
+			}
             else if (wParam == VK_F3)
             {
                 g_bClipCursor = !g_bClipCursor;
@@ -7264,6 +7268,11 @@ void CxbxUpdateNativeD3DResources()
 			g_pD3DDevice->SetVertexShaderConstantF(i, (float*)&nv2a->pgraph.vsh_constants[i][0], 1);
 			nv2a->pgraph.vsh_constants_dirty[i] = false;
 		}
+	}
+
+	// Update fixed function vertex shader state
+	if (g_Xbox_VertexShaderMode == VertexShaderMode::FixedFunction && g_UseFixedFunctionVertexShader) {
+		UpdateFixedFunctionVertexShaderState();
 	}
 
     // NOTE: Order is important here
