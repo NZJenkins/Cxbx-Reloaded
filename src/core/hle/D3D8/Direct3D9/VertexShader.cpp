@@ -220,6 +220,90 @@ extern ShaderType EmuGetShaderInfo(IntermediateVertexShader* pIntermediateShader
 	return ShaderType::Compilable;
 }
 
+HRESULT CompileHlsl(const std::string& hlsl, ID3DBlob** ppHostShader, const char* pSourceName)
+{
+	// TODO include header in vertex shader
+	//XTL::X_VSH_SHADER_HEADER* pXboxVertexShaderHeader = (XTL::X_VSH_SHADER_HEADER*)pXboxFunction;
+	ID3DBlob* pErrors = nullptr;
+	ID3DBlob* pErrorsCompatibility = nullptr;
+	HRESULT             hRet = 0;
+
+	UINT flags1 = D3DCOMPILE_OPTIMIZATION_LEVEL3;
+	hRet = D3DCompile(
+		hlsl.c_str(),
+		hlsl.length(),
+		pSourceName, // pSourceName
+		nullptr, // pDefines
+		nullptr, // pInclude // TODO precompile x_* HLSL functions?
+		"main", // shader entry poiint
+		g_vs_model, // shader profile
+		flags1, // flags1
+		0, // flags2
+		ppHostShader, // out
+		&pErrors // ppErrorMsgs out
+	);
+	if (FAILED(hRet)) {
+		EmuLog(LOG_LEVEL::WARNING, "Shader compile failed. Recompiling in compatibility mode");
+		// Attempt to retry in compatibility mode, this allows some vertex-state shaders to compile
+		// Test Case: Spy vs Spy
+		flags1 |= D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY | D3DCOMPILE_AVOID_FLOW_CONTROL;
+		hRet = D3DCompile(
+			hlsl.c_str(),
+			hlsl.length(),
+			pSourceName, // pSourceName
+			nullptr, // pDefines
+			nullptr, // pInclude // TODO precompile x_* HLSL functions?
+			"main", // shader entry poiint
+			g_vs_model, // shader profile
+			flags1, // flags1
+			0, // flags2
+			ppHostShader, // out
+			&pErrorsCompatibility // ppErrorMsgs out
+		);
+
+		if (FAILED(hRet)) {
+			LOG_TEST_CASE("Couldn't assemble vertex shader");
+		}
+	}
+
+	// Determine the log level
+	auto hlslErrorLogLevel = FAILED(hRet) ? LOG_LEVEL::ERROR2 : LOG_LEVEL::DEBUG;
+	if (pErrors) {
+		// Log errors from the initial compilation
+		EmuLog(hlslErrorLogLevel, "%s", (char*)(pErrors->GetBufferPointer()));
+		pErrors->Release();
+		pErrors = nullptr;
+	}
+
+	// Failure to recompile in compatibility mode ignored for now
+	if (pErrorsCompatibility != nullptr) {
+		pErrorsCompatibility->Release();
+		pErrorsCompatibility = nullptr;
+	}
+
+	LOG_CHECK_ENABLED(LOG_LEVEL::DEBUG) {
+		if (g_bPrintfOn) {
+			if (!FAILED(hRet)) {
+				// Log disassembly
+				hRet = D3DDisassemble(
+					(*ppHostShader)->GetBufferPointer(),
+					(*ppHostShader)->GetBufferSize(),
+					D3D_DISASM_ENABLE_DEFAULT_VALUE_PRINTS | D3D_DISASM_ENABLE_INSTRUCTION_NUMBERING,
+					NULL,
+					&pErrors
+				);
+				if (pErrors) {
+					EmuLog(hlslErrorLogLevel, "%s", (char*)(pErrors->GetBufferPointer()));
+					pErrors->Release();
+				}
+			}
+		}
+	}
+
+	return hRet;
+}
+
+
 // recompile xbox vertex shader function
 extern HRESULT EmuCompileShader
 (
@@ -227,11 +311,6 @@ extern HRESULT EmuCompileShader
 	ID3DBlob** ppHostShader
 )
 {
-	// TODO include header in vertex shader
-	//xbox::X_VSH_SHADER_HEADER* pXboxVertexShaderHeader = (xbox::X_VSH_SHADER_HEADER*)pXboxFunction;
-	ID3DBlob* pErrors = nullptr;
-	HRESULT             hRet = 0;
-
 	// Include HLSL header and footer as raw strings :
 	static std::string hlsl_template[2] = {
 		#include "core\hle\D3D8\Direct3D9\CxbxVertexShaderTemplate.hlsl"
@@ -249,71 +328,5 @@ extern HRESULT EmuCompileShader
 	EmuLog(LOG_LEVEL::DEBUG, DebugPrependLineNumbers(hlsl_str).c_str());
 	EmuLog(LOG_LEVEL::DEBUG, "-----------------------");
 
-
-	UINT flags1 = D3DCOMPILE_OPTIMIZATION_LEVEL3 | D3DCOMPILE_AVOID_FLOW_CONTROL;
-
-	hRet = D3DCompile(
-		hlsl_str.c_str(),
-		hlsl_str.length(),
-		nullptr, // pSourceName
-		nullptr, // pDefines
-		nullptr, // pInclude // TODO precompile x_* HLSL functions?
-		"main", // shader entry poiint
-		g_vs_model, // shader profile
-		flags1, // flags1
-		0, // flags2
-		ppHostShader, // out
-		&pErrors // ppErrorMsgs out
-	);
-	if (FAILED(hRet)) {
-		// Attempt to retry in compatibility mode, this allows some vertex-state shaders to compile
-		// Test Case: Spy vs Spy
-		flags1 |= D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY;
-		hRet = D3DCompile(
-			hlsl_str.c_str(),
-			hlsl_str.length(),
-			nullptr, // pSourceName
-			nullptr, // pDefines
-			nullptr, // pInclude // TODO precompile x_* HLSL functions?
-			"main", // shader entry poiint
-			g_vs_model, // shader profile
-			flags1, // flags1
-			0, // flags2
-			ppHostShader, // out
-			&pErrors // ppErrorMsgs out
-		);
-
-		if (FAILED(hRet)) {
-			LOG_TEST_CASE("Couldn't assemble recompiled vertex shader");
-			//EmuLog(LOG_LEVEL::WARNING, "Couldn't assemble recompiled vertex shader");
-		}
-	}
-
-	// Determine the log level
-	auto hlslErrorLogLevel = FAILED(hRet) ? LOG_LEVEL::ERROR2 : LOG_LEVEL::DEBUG;
-	if (pErrors) {
-		// Log HLSL compiler errors
-		EmuLog(hlslErrorLogLevel, "%s", (char*)(pErrors->GetBufferPointer()));
-		pErrors->Release();
-		pErrors = nullptr;
-	}
-
-	LOG_CHECK_ENABLED(LOG_LEVEL::DEBUG)
-		if (g_bPrintfOn)
-			if (!FAILED(hRet)) {
-				// Log disassembly
-				hRet = D3DDisassemble(
-					(*ppHostShader)->GetBufferPointer(),
-					(*ppHostShader)->GetBufferSize(),
-					D3D_DISASM_ENABLE_DEFAULT_VALUE_PRINTS | D3D_DISASM_ENABLE_INSTRUCTION_NUMBERING,
-					NULL,
-					&pErrors
-				);
-				if (pErrors) {
-					EmuLog(hlslErrorLogLevel, "%s", (char*)(pErrors->GetBufferPointer()));
-					pErrors->Release();
-				}
-			}
-
-	return hRet;
+	return CompileHlsl(hlsl_str, ppHostShader, "CxbxVertexShaderTemplate.hlsl");
 }
