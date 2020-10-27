@@ -1306,15 +1306,32 @@ void RegisterCxbxVertexShader(DWORD XboxVertexShaderHandle, CxbxVertexShader* sh
 	g_CxbxVertexShaders[XboxVertexShaderHandle] = shader;
 }
 
-// Converts an Xbox FVF shader handle to X_VERTEXATTRIBUTEFORMAT
+// Converts an Xbox FVF shader handle to X_D3DVertexShader
 // Note : Temporary, until we reliably locate the Xbox internal state for this
-xbox::X_VERTEXATTRIBUTEFORMAT CxbxFVFToXboxVertexAttributeFormat(DWORD xboxFvf)
+// See D3DXDeclaratorFromFVF docs https://docs.microsoft.com/en-us/windows/win32/direct3d9/d3dxdeclaratorfromfvf
+// and https://github.com/reactos/wine/blob/2e8dfbb1ad71f24c41e8485a39df01bb9304127f/dlls/d3dx9_36/mesh.c#L2041
+static xbox::X_VERTEXATTRIBUTEFORMAT XboxVertexShaderFromFVF(DWORD xboxFvf)
 {
 	using namespace xbox;
 
-	X_VERTEXATTRIBUTEFORMAT declaration = { 0 }; // FVFs don't tesselate, all slots read from stream zero
+	// Note : FVFs don't tessellate, all slots read from stream zero, therefore
+	// the following zero-initialization of StreamIndex (like all other fields)
+	// is never updated below.
+	// g_Xbox_VertexShader_ForFVF = { 0 };
+
+	// Shorthand, glueing earlier implementation below to global g_Xbox_VertexShader_ForFVF variable :
+	X_VERTEXATTRIBUTEFORMAT declaration = { 0 };
 
 	static DWORD X_D3DVSDT_FLOAT[] = { 0, X_D3DVSDT_FLOAT1, X_D3DVSDT_FLOAT2, X_D3DVSDT_FLOAT3, X_D3DVSDT_FLOAT4 };
+
+	static const DWORD InvalidXboxFVFBits = X_D3DFVF_RESERVED0 | X_D3DFVF_RESERVED1 /* probably D3DFVF_PSIZE if detected */
+		| 0x0000F000 // Bits between texture count and the texture formats
+		| 0xFF000000; // All bits above the four alllowed texture formats
+
+	if (xboxFvf & InvalidXboxFVFBits) {
+		// Test-case : JSRF (after "now Loading...") TODO : Figure out what's going on
+		// LOG_TEST_CASE("Invalid Xbox FVF bits detected!");
+	}
 
 	// Position & Blendweights
 	int nrPositionFloats = 3;
@@ -1322,34 +1339,36 @@ xbox::X_VERTEXATTRIBUTEFORMAT CxbxFVFToXboxVertexAttributeFormat(DWORD xboxFvf)
 	unsigned offset = 0;
 	DWORD position = (xboxFvf & X_D3DFVF_POSITION_MASK);
 	switch (position) {
-		case 0: nrPositionFloats = 0; LOG_TEST_CASE("FVF without position"); break; // Note : Remove logging if this occurs often
-		case X_D3DFVF_XYZ: /*nrPositionFloats is set to 3 by default*/ break;
-		case X_D3DFVF_XYZRHW: nrPositionFloats = 4; break;
-		case X_D3DFVF_XYZB1: nrBlendWeights = 1; break;
-		case X_D3DFVF_XYZB2: nrBlendWeights = 2; break;
-		case X_D3DFVF_XYZB3: nrBlendWeights = 3; break;
-		case X_D3DFVF_XYZB4: nrBlendWeights = 4; break;
-		case X_D3DFVF_POSITION_MASK: /*Keep nrPositionFloats set to 3*/ LOG_TEST_CASE("FVF invalid (5th blendweight?)"); break;
+	case 0: nrPositionFloats = 0; LOG_TEST_CASE("FVF without position"); break; // Note : Remove logging if this occurs often
+	case X_D3DFVF_XYZ: /*nrPositionFloats is set to 3 by default*/ break;
+	case X_D3DFVF_XYZRHW:
+		// g_Xbox_VertexShader_ForFVF.Flags |= X_VERTEXSHADER_FLAG_PASSTHROUGH;
+		nrPositionFloats = 4;
+		break;
+	case X_D3DFVF_XYZB1: nrBlendWeights = 1; break;
+	case X_D3DFVF_XYZB2: nrBlendWeights = 2; break;
+	case X_D3DFVF_XYZB3: nrBlendWeights = 3; break;
+	case X_D3DFVF_XYZB4: nrBlendWeights = 4; break;
+	case X_D3DFVF_POSITION_MASK: /*Keep nrPositionFloats set to 3*/ LOG_TEST_CASE("FVF invalid (5th blendweight?)"); break;
 		DEFAULT_UNREACHABLE;
 	}
 
 	// Assign vertex element (attribute) slots
 	X_VERTEXSHADERINPUT* pSlot;
 
+	// Write Position
 	if (nrPositionFloats > 0) {
-		// Write Position
 		pSlot = &declaration.Slots[X_D3DVSDE_POSITION];
 		pSlot->Format = X_D3DVSDT_FLOAT[nrPositionFloats];
 		pSlot->Offset = offset;
 		offset += sizeof(float) * nrPositionFloats;
-	}
-
-	if (nrBlendWeights > 0) {
 		// Write Blend Weights
-		pSlot = &declaration.Slots[X_D3DVSDE_BLENDWEIGHT];
-		pSlot->Format = X_D3DVSDT_FLOAT[nrBlendWeights];
-		pSlot->Offset = offset;
-		offset += sizeof(float) * nrBlendWeights;
+		if (nrBlendWeights > 0) {
+			pSlot = &declaration.Slots[X_D3DVSDE_BLENDWEIGHT];
+			pSlot->Format = X_D3DVSDT_FLOAT[nrBlendWeights];
+			pSlot->Offset = offset;
+			offset += sizeof(float) * nrBlendWeights;
+		}
 	}
 
 	// Write Normal, Diffuse, and Specular
@@ -1363,13 +1382,17 @@ xbox::X_VERTEXATTRIBUTEFORMAT CxbxFVFToXboxVertexAttributeFormat(DWORD xboxFvf)
 		pSlot->Offset = offset;
 		offset += sizeof(float) * 3;
 	}
+
 	if (xboxFvf & X_D3DFVF_DIFFUSE) {
+		// g_Xbox_VertexShader_ForFVF.Flags |= X_VERTEXSHADER_FLAG_HASDIFFUSE;
 		pSlot = &declaration.Slots[X_D3DVSDE_DIFFUSE];
 		pSlot->Format = X_D3DVSDT_D3DCOLOR;
 		pSlot->Offset = offset;
 		offset += sizeof(DWORD) * 1;
 	}
+
 	if (xboxFvf & X_D3DFVF_SPECULAR) {
+		// g_Xbox_VertexShader_ForFVF.Flags |= X_VERTEXSHADER_FLAG_HASSPECULAR;
 		pSlot = &declaration.Slots[X_D3DVSDE_SPECULAR];
 		pSlot->Format = X_D3DVSDT_D3DCOLOR;
 		pSlot->Offset = offset;
@@ -1378,7 +1401,10 @@ xbox::X_VERTEXATTRIBUTEFORMAT CxbxFVFToXboxVertexAttributeFormat(DWORD xboxFvf)
 
 	// Write Texture Coordinates
 	int textureCount = (xboxFvf & X_D3DFVF_TEXCOUNT_MASK) >> X_D3DFVF_TEXCOUNT_SHIFT;
-	assert(textureCount <= 4); // Safeguard, since the X_D3DFVF_TEXCOUNT bitfield could contain invalid values (5 up to 15)
+	if (textureCount > 4) {
+		LOG_TEST_CASE("Limiting FVF to 4 textures");
+		textureCount = 4; // Safeguard, since the X_D3DFVF_TEXCOUNT bitfield could contain invalid values (5 up to 15)
+	}
 	for (int i = 0; i < textureCount; i++) {
 		int numberOfCoordinates = 0;
 		auto FVFTextureFormat = (xboxFvf >> X_D3DFVF_TEXCOORDSIZE_SHIFT(i)) & 0x003;
@@ -1395,6 +1421,17 @@ xbox::X_VERTEXATTRIBUTEFORMAT CxbxFVFToXboxVertexAttributeFormat(DWORD xboxFvf)
 		pSlot->Format = X_D3DVSDT_FLOAT[numberOfCoordinates];
 		pSlot->Offset = offset;
 		offset += sizeof(float) * numberOfCoordinates;
+		// Update the VertexShader texture Dimensionality field here as well
+		// g_Xbox_VertexShader_ForFVF.Dimensionality[i] = numberOfCoordinates;
+	}
+
+	// Make sure all unused slots have a X_D3DVSDT_NONE format
+	// TODO : Actually, maybe not, since this could avoid VshConvertToken_STREAMDATA_REG() calls!
+	for (unsigned i = 0; i < X_VSH_MAX_ATTRIBUTES; i++) {
+		pSlot = &declaration.Slots[i];
+		if (pSlot->Format == 0) {
+			pSlot->Format = X_D3DVSDT_NONE;
+		}
 	}
 
 	return declaration;
@@ -1408,12 +1445,12 @@ HRESULT SetFvf(DWORD xboxFvf) {
 	HRESULT hRet = g_pD3DDevice->SetFVF(xboxFvf);
 
 	// Ensure HLSL shaders know which vertex registers are in use
-	auto vertexAttr = CxbxFVFToXboxVertexAttributeFormat(xboxFvf);
+	auto vertexAttr = XboxVertexShaderFromFVF(xboxFvf);
 	// FIXME remove copy-pasted code
 	// unify with SetCxbxVertexDeclaration
 	float vertexDefaultFlags[X_VSH_MAX_ATTRIBUTES];
 	for (int i = 0; i < X_VSH_MAX_ATTRIBUTES; i++) {
-		vertexDefaultFlags[i] = vertexAttr.Slots[i].Format > 0 ? 0.0f : 1.0f;
+		vertexDefaultFlags[i] = vertexAttr.Slots[i].Format != xbox::X_D3DVSDT_NONE ? 0.0f : 1.0f;
 	}
 	g_pD3DDevice->SetVertexShaderConstantF(CXBX_D3DVS_CONSTREG_VREGDEFAULTS_FLAG_BASE, vertexDefaultFlags, 4);
 
