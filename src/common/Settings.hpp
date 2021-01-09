@@ -174,7 +174,8 @@ public:
 		bool Reserved4;
 		bool Reserved7 = 0;
 		bool Reserved8 = 0;
-		int  Reserved99[8] = { 0 };
+		bool UseD3D9FixedFunction;
+		int  Reserved99[7] = { 0 };
 	} m_hacks;
 	static_assert(sizeof(s_hack) == 0x28, assert_check_shared_memory(s_hack));
 

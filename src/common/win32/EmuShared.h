@@ -181,6 +181,7 @@ class EmuShared : public Mutex
 		void SetUseAllCores(const int* value) { Lock(); m_hacks.UseAllCores = *value; Unlock(); }
 		void GetSkipRdtscPatching(int* value) { Lock(); *value = m_hacks.SkipRdtscPatching; Unlock(); }
 		void SetSkipRdtscPatching(const int* value) { Lock(); m_hacks.SkipRdtscPatching = *value; Unlock(); }
+		void GetUseD3D9FixedFunction(int* value) { Lock(); *value = m_hacks.UseD3D9FixedFunction; Unlock(); }
 
 		// ******************************************************************
 		// * FPS/Benchmark values Accessors

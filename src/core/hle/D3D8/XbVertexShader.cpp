@@ -59,7 +59,6 @@ extern XboxRenderStateConverter XboxRenderStates; // Declared in Direct3D9.cpp
  xbox::X_VERTEXATTRIBUTEFORMAT g_Xbox_SetVertexShaderInput_Attributes = { 0 }; // Read by GetXboxVertexAttributes when g_Xbox_SetVertexShaderInput_Count > 0
 
 VertexShaderMode g_Xbox_VertexShaderMode = VertexShaderMode::FixedFunction;
-bool g_UseFixedFunctionVertexShader = true;
 
                 xbox::dword_xt g_Xbox_VertexShader_Handle = 0;
 #ifdef CXBX_USE_GLOBAL_VERTEXSHADER_POINTER // TODO : Would this be more accurate / simpler?
@@ -1135,7 +1134,7 @@ void CxbxUpdateHostVertexShader()
 		IDirect3DVertexShader* fixedFunctionShader = nullptr;
 		HRESULT hRet;
 
-		if (g_UseFixedFunctionVertexShader) {
+		if (!g_UseD3D9FixedFunction) {
 			static IDirect3DVertexShader* ffHlsl = nullptr;
 			if (ffHlsl == nullptr) {
 				ID3DBlob* pBlob = nullptr;

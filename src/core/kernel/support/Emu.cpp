@@ -51,6 +51,7 @@ volatile bool    g_bPrintfOn = true;
 bool g_DisablePixelShaders = false;
 bool g_UseAllCores = false;
 bool g_SkipRdtscPatching = false;
+bool g_UseD3D9FixedFunction = false;
 
 // Delta added to host SystemTime, used in KiClockIsr and KeSetSystemTime
 // This shouldn't need to be atomic, but because raising the IRQL to high lv in KeSetSystemTime doesn't really stop KiClockIsr from running,

@@ -1936,10 +1936,6 @@ static LRESULT WINAPI EmuMsgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPar
             {
                 VertexBufferConverter.PrintStats();
             }
-			else if (wParam == VK_F2)
-			{
-				g_UseFixedFunctionVertexShader = !g_UseFixedFunctionVertexShader;
-			}
             else if (wParam == VK_F3)
             {
                 g_bClipCursor = !g_bClipCursor;
@@ -7499,7 +7495,7 @@ void CxbxUpdateNativeD3DResources()
 	CxbxUpdateHostViewport();
 	
 	// Update fixed function vertex shader state
-	if (g_Xbox_VertexShaderMode == VertexShaderMode::FixedFunction && g_UseFixedFunctionVertexShader) {
+	if (g_Xbox_VertexShaderMode == VertexShaderMode::FixedFunction && !g_UseD3D9FixedFunction) {
 		UpdateFixedFunctionVertexShaderState();
 	}
 

@@ -320,6 +320,7 @@ void PrintCurrentConfigurationLog()
 		EmuLogInit(LOG_LEVEL::INFO, "Disable Pixel Shaders: %s", g_DisablePixelShaders == 1 ? "On" : "Off (Default)");
 		EmuLogInit(LOG_LEVEL::INFO, "Run Xbox threads on all cores: %s", g_UseAllCores == 1 ? "On" : "Off (Default)");
 		EmuLogInit(LOG_LEVEL::INFO, "Skip RDTSC Patching: %s", g_SkipRdtscPatching == 1 ? "On" : "Off (Default)");
+		EmuLogInit(LOG_LEVEL::INFO, "Use D3D9 Fixed Function: %s", g_UseD3D9FixedFunction == 1 ? "On" : "Off (Default)");
 	}
 
 	EmuLogInit(LOG_LEVEL::INFO, "------------------------- END OF CONFIG LOG ------------------------");
@@ -1324,6 +1325,8 @@ __declspec(noreturn) void CxbxKrnlInit
 		g_UseAllCores = !!HackEnabled;
 		g_EmuShared->GetSkipRdtscPatching(&HackEnabled);
 		g_SkipRdtscPatching = !!HackEnabled;
+		g_EmuShared->GetUseD3D9FixedFunction(&HackEnabled);
+		g_UseD3D9FixedFunction = !!HackEnabled;
 	}
 
 #ifdef _DEBUG_PRINT_CURRENT_CONF

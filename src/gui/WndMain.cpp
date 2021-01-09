@@ -476,6 +476,13 @@ LRESULT CALLBACK WndMain::WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lP
         {
             switch(wParam)
             {
+				case VK_F2:
+				{
+					g_Settings->m_hacks.UseD3D9FixedFunction = !g_Settings->m_hacks.UseD3D9FixedFunction;
+					RefreshMenus();
+					break;
+				}
+
                 case VK_F5:
                 {
 					// Start emulation normally
@@ -1293,6 +1300,11 @@ LRESULT CALLBACK WndMain::WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lP
 				RefreshMenus();
 				break;
 
+			case ID_HACKS_USED3D9FIXEDFUNCTION:
+				g_Settings->m_hacks.UseD3D9FixedFunction = !g_Settings->m_hacks.UseD3D9FixedFunction;
+				RefreshMenus();
+				break;
+
 			case ID_SETTINGS_IGNOREINVALIDXBESIG:
 				g_Settings->m_gui.bIgnoreInvalidXbeSig = !g_Settings->m_gui.bIgnoreInvalidXbeSig;
 				RefreshMenus();
@@ -1750,6 +1762,9 @@ void WndMain::RefreshMenus()
 
 			chk_flag = (g_Settings->m_hacks.SkipRdtscPatching) ? MF_CHECKED : MF_UNCHECKED;
 			CheckMenuItem(settings_menu, ID_HACKS_SKIPRDTSCPATCHING, chk_flag);
+
+			chk_flag = (g_Settings->m_hacks.UseD3D9FixedFunction) ? MF_CHECKED : MF_UNCHECKED;
+			CheckMenuItem(settings_menu, ID_HACKS_USED3D9FIXEDFUNCTION, chk_flag);
 
 			switch (g_Settings->m_gui.DataStorageToggle) {
 				case CXBX_DATA_APPDATA:
