@@ -196,7 +196,6 @@ typedef struct _VSH_INTERMEDIATE_FORMAT {
 } VSH_INTERMEDIATE_FORMAT;
 
 typedef struct _IntermediateVertexShader {
-	xbox::X_VSH_SHADER_HEADER Header;
 	std::vector<VSH_INTERMEDIATE_FORMAT> Instructions;
 } IntermediateVertexShader;
 
@@ -204,9 +203,10 @@ typedef struct _IntermediateVertexShader {
 extern void EmuParseVshFunction
 (
 	DWORD* pXboxFunction,
-	DWORD* pXboxFunctionSize,
 	IntermediateVertexShader* pShader
 );
+
+extern size_t GetVshFunctionSize(const xbox::dword_xt* pXboxFunction);
 
 inline boolean VshHandleIsVertexShader(DWORD Handle) { return (Handle & X_D3DFVF_RESERVED0) ? TRUE : FALSE; }
 inline xbox::X_D3DVertexShader *VshHandleToXboxVertexShader(DWORD Handle) { return (xbox::X_D3DVertexShader *)(Handle & ~X_D3DFVF_RESERVED0);}
@@ -229,5 +229,4 @@ extern void CxbxImpl_SetVertexShaderConstant(INT Register, PVOID pConstantData, 
 extern void CxbxImpl_DeleteVertexShader(DWORD Handle);
 extern void CxbxVertexShaderSetFlags();
 extern HRESULT SetVertexShader(IDirect3DVertexShader* pShader);
-
 #endif
