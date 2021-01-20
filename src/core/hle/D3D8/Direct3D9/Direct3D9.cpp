@@ -155,7 +155,7 @@ static xbox::X_D3DVBLANKCALLBACK     g_pXbox_VerticalBlankCallback   = xbox::zer
 
        xbox::X_D3DSurface           *g_pXbox_BackBufferSurface = xbox::zeroptr;
 static xbox::X_D3DSurface           *g_pXbox_DefaultDepthStencilSurface = xbox::zeroptr;
-       xbox::X_D3DSurface           *g_pXbox_RenderTarget = xbox::zeroptr;
+
 static xbox::X_D3DSurface           *g_pXbox_DepthStencil = xbox::zeroptr;
        xbox::X_D3DMULTISAMPLE_TYPE   g_Xbox_MultiSampleType = xbox::X_D3DMULTISAMPLE_NONE;
 
@@ -176,6 +176,52 @@ float g_Xbox_BackbufferScaleX = 1;
 float g_Xbox_BackbufferScaleY = 1;
 
 static constexpr size_t INDEX_BUFFER_CACHE_SIZE = 10000;
+
+uint32_t GetPixelContainerWidth(xbox::X_D3DPixelContainer* pPixelContainer);
+uint32_t GetPixelContainerHeight(xbox::X_D3DPixelContainer* pPixelContainer);
+// Xbox surface wrapper tracks and synchronizes dimensions
+struct WrappedXboxSurface {
+	DWORD GetCachedWidth() { return _width; }
+	DWORD GetCachedHeight() { return _height; }
+
+	// Update cached dimensions
+	// Returns true if the dimensions changed since the rendertarget pointer was set
+	bool SyncDimensions() {
+		auto lastWidth = _width;
+		auto lastHeight = _height;
+
+		if (pXboxSurface) {
+			_width = GetPixelContainerWidth(pXboxSurface);
+			_height = GetPixelContainerHeight(pXboxSurface);
+		}
+		else {
+			_width = _height = 0;
+		}
+
+		return _width != lastWidth || _height != lastHeight;
+	}
+
+	// Get dimensions with the current upscale factor applied
+	void GetUpscaledDimensions(uint32_t* pWidth, uint32_t* pHeight) {
+		*pWidth = _width * g_RenderTargetUpscaleFactor;
+		*pHeight = _height * g_RenderTargetUpscaleFactor;
+	}
+
+	operator xbox::X_D3DSurface* () const { return pXboxSurface; }
+
+	void operator = (xbox::X_D3DSurface* pNewXboxSurface) {
+		pXboxSurface = pNewXboxSurface;
+		SyncDimensions();
+	}
+
+private:
+	xbox::X_D3DSurface* pXboxSurface = xbox::zeroptr;
+	DWORD _height = 0;
+	DWORD _width = 0;
+};
+
+WrappedXboxSurface g_pXbox_RenderTarget = {};
+
 
 /* Unused :
 static xbox::dword_xt                  *g_Xbox_D3DDevice; // TODO: This should be a D3DDevice structure
@@ -2913,16 +2959,11 @@ void GetScreenScaleFactors(float& scaleX, float& scaleY) {
 	}
 }
 
-// Get the raw subpixel dimensions of the rendertarget buffer
-void GetRenderTargetRawDimensions(float& x, float&y) {
-	x = (float) GetPixelContainerWidth(g_pXbox_RenderTarget);
-	y = (float) GetPixelContainerHeight(g_pXbox_RenderTarget);
-}
-
 // Get the base rendertarget dimensions excluding multisample scaling
 // e.g. a raw 1280*960 rendertarget with 2x MSAA would be have a base 640*480
 void GetRenderTargetBaseDimensions(float& x, float& y) {
-	GetRenderTargetRawDimensions(x, y);
+	x = g_pXbox_RenderTarget.GetCachedWidth();
+	y = g_pXbox_RenderTarget.GetCachedHeight();
 
 	float aaX, aaY;
 	GetMultiSampleScaleRaw(aaX, aaY);
@@ -4039,36 +4080,6 @@ xbox::void_xt WINAPI xbox::EMUPATCH(D3DDevice_GetBackBuffer)
     *ppBackBuffer = EMUPATCH(D3DDevice_GetBackBuffer2)(BackBuffer);
 }
 
-bool GetHostRenderTargetDimensions(DWORD *pHostWidth, DWORD *pHostHeight, IDirect3DSurface* pHostRenderTarget = nullptr)
-{
-	bool shouldRelease = false;
-	if (pHostRenderTarget == nullptr) {
-		g_pD3DDevice->GetRenderTarget(
-			0, // RenderTargetIndex
-			&pHostRenderTarget);
-
-		shouldRelease = true;
-	}
-
-	// The following can only work if we could retrieve a host render target
-	if (!pHostRenderTarget) {
-		return false;
-	}
-
-	// Get current host render target dimensions
-	D3DSURFACE_DESC HostRenderTarget_Desc;
-	pHostRenderTarget->GetDesc(&HostRenderTarget_Desc);
-
-	if (shouldRelease) {
-		pHostRenderTarget->Release();
-	}
-
-	*pHostWidth = HostRenderTarget_Desc.Width;
-	*pHostHeight = HostRenderTarget_Desc.Height;
-
-	return true;
-}
-
 DWORD ScaleDWORD(DWORD Value, DWORD FromMax, DWORD ToMax)
 {
 	uint64_t tmp = Value;
@@ -4077,16 +4088,14 @@ DWORD ScaleDWORD(DWORD Value, DWORD FromMax, DWORD ToMax)
 	return (DWORD)tmp;
 }
 
-void ValidateRenderTargetDimensions(DWORD HostRenderTarget_Width, DWORD HostRenderTarget_Height, DWORD XboxRenderTarget_Width, DWORD XboxRenderTarget_Height)
+void ValidateRenderTargetDimensions()
 {
     // This operation is often used to change the display resolution without calling SetRenderTarget!
     // This works by updating the underlying Width & Height of the Xbox surface, without reallocating the data
     // Because of this, we need to validate that the associated host resource still matches the dimensions of the Xbox Render Target
     // If not, we must force them to be re-created
     // TEST CASE: Chihiro Factory Test Program
-    DWORD XboxRenderTarget_Width_Scaled = XboxRenderTarget_Width * g_RenderTargetUpscaleFactor;
-    DWORD XboxRenderTarget_Height_Scaled = XboxRenderTarget_Height * g_RenderTargetUpscaleFactor;
-    if (HostRenderTarget_Width != XboxRenderTarget_Width_Scaled || HostRenderTarget_Height != XboxRenderTarget_Height_Scaled) {
+    if (g_pXbox_RenderTarget.SyncDimensions()) {
         LOG_TEST_CASE("Existing RenderTarget width/height changed");
 
         FreeHostResource(GetHostResourceKey(g_pXbox_RenderTarget)); g_pD3DDevice->SetRenderTarget(0, GetHostSurface(g_pXbox_RenderTarget, D3DUSAGE_RENDERTARGET));
@@ -7231,10 +7240,12 @@ void CxbxUpdateHostViewport() {
 	GetMultiSampleScaleRaw(aaScaleX, aaScaleY);
 	GetMultiSampleOffset(aaOffsetX, aaOffsetY);
 
-	DWORD HostRenderTarget_Width, HostRenderTarget_Height;
-	if (!GetHostRenderTargetDimensions(&HostRenderTarget_Width, &HostRenderTarget_Height)) {
-		LOG_TEST_CASE("Could not get rendertarget dimensions while setting the viewport");
+	if (!g_pXbox_RenderTarget) {
+		LOG_TEST_CASE("No rendertarget set when updating the viewport");
 	}
+
+	uint32_t HostRenderTarget_Width, HostRenderTarget_Height;
+	g_pXbox_RenderTarget.GetUpscaledDimensions(&HostRenderTarget_Width, &HostRenderTarget_Height);
 
 	aaScaleX *= g_RenderTargetUpscaleFactor;
 	aaScaleY *= g_RenderTargetUpscaleFactor;
@@ -7290,6 +7301,8 @@ extern void CxbxUpdateHostVertexShader(); // TMP glue
 
 void CxbxUpdateNativeD3DResources()
 {
+	ValidateRenderTargetDimensions();
+
 	// Before we start, make sure our resource cache stays limited in size
 	PrunePaletizedTexturesCache(); // TODO : Could we move this to Swap instead?
 
@@ -8021,13 +8034,7 @@ static void CxbxImpl_SetRenderTarget
 		UpdateDepthStencilFlags(pHostDepthStencil);
 	}
 
-    // Validate that our host render target is still the correct size
-    DWORD HostRenderTarget_Width, HostRenderTarget_Height;
-    if (GetHostRenderTargetDimensions(&HostRenderTarget_Width, &HostRenderTarget_Height, pHostRenderTarget)) {
-        DWORD XboxRenderTarget_Width = GetPixelContainerWidth(g_pXbox_RenderTarget);
-        DWORD XboxRenderTarget_Height = GetPixelContainerHeight(g_pXbox_RenderTarget);
-        ValidateRenderTargetDimensions(HostRenderTarget_Width, HostRenderTarget_Height, XboxRenderTarget_Width, XboxRenderTarget_Height);
-    }
+	// FIXME need to add back host rendertarget dimension validation
 }
 
 // ******************************************************************
