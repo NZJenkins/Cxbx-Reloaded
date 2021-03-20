@@ -1134,8 +1134,6 @@ IDirect3DVertexDeclaration* CxbxCreateHostVertexDeclaration(D3DVERTEXELEMENT *pD
 static IDirect3DVertexShader* passthroughshader;
 void CxbxUpdateHostVertexShader()
 {
-	extern bool g_bUsePassthroughHLSL; // TMP glue
-
 	// TODO Call this when state is dirty
 	// Rather than every time state changes
 
@@ -1160,17 +1158,6 @@ void CxbxUpdateHostVertexShader()
 
 		hRet = g_pD3DDevice->SetVertexShader(fixedFunctionShader);
 		if (FAILED(hRet)) CxbxKrnlCleanup("Failed to set fixed-function shader");
-	}
-	else if (g_Xbox_VertexShaderMode == VertexShaderMode::Passthrough && g_bUsePassthroughHLSL) {
-		if (passthroughshader == nullptr) {
-			ID3DBlob* pBlob = nullptr;
-			EmuCompileXboxPassthrough(&pBlob);
-			if (pBlob) {
-				g_pD3DDevice->CreateVertexShader((DWORD*)pBlob->GetBufferPointer(), &passthroughshader);
-			}
-		}
-
-		HRESULT hRet = g_pD3DDevice->SetVertexShader(passthroughshader);
 	}
 	else {
 		auto pTokens = GetCxbxVertexShaderSlotPtr(g_Xbox_VertexShader_FunctionSlots_StartAddress);

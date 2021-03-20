@@ -101,7 +101,6 @@ static bool                         g_bHasDepth = false;    // Does device have 
        float                        g_ZScale = 1.0;
 static bool                         g_bHasStencil = false;  // Does device have a Stencil Buffer?
 static DWORD						g_dwPrimPerFrame = 0;	// Number of primitives within one frame
-       bool                         g_bUsePassthroughHLSL = true;
 static float                        g_AspectRatioScale = 1.0f;
 static UINT                         g_AspectRatioScaleWidth = 0;
 static UINT                         g_AspectRatioScaleHeight = 0;
@@ -1927,10 +1926,6 @@ static LRESULT WINAPI EmuMsgProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPar
                 // sometimes, so detect it and stop emulation from here too :
                 SendMessage(hWnd, WM_CLOSE, 0, 0); // See StopEmulation();
             }
-			else if (wParam == VK_F7)
-			{
-				g_bUsePassthroughHLSL = !g_bUsePassthroughHLSL;
-			}
             else if(wParam == VK_F8)
             {
                 g_bPrintfOn = !g_bPrintfOn;
